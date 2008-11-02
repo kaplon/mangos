@@ -382,7 +382,7 @@ bool OutdoorPvPObjectiveZM_GraveYard::CanTalkTo(Player * plr, Creature * c, Goss
     {
         if(itr->second == ZM_ALLIANCE_FIELD_SCOUT && plr->GetTeam() == ALLIANCE && m_BothControllingFaction == ALLIANCE && !m_FlagCarrierGUID && m_GraveYardState != ZM_GRAVEYARD_A)
         {
-            gso.Option.assign("Give me the flag, I'll take it to the Central Tower for the glory of the Alliance!");
+            gso.OptionText.assign("Give me the flag, I'll take it to the Central Tower for the glory of the Alliance!");
             return true;
         }
         else if(itr->second == ZM_HORDE_FIELD_SCOUT && plr->GetTeam() == HORDE && m_BothControllingFaction == HORDE && !m_FlagCarrierGUID && m_GraveYardState != ZM_GRAVEYARD_H)

@@ -690,7 +690,7 @@ void OutdoorPvPObjectiveEP_PWT::SummonFlightMaster(uint32 team)
         GossipOption * gso = new GossipOption;
         gso->Action = GOSSIP_OPTION_OUTDOORPVP;
         gso->GossipId = 0;
-        gso->Option.assign("As the breeze whips straight as an arrow, let her go over Kill Devil Hill!");
+        gso->OptionText.assign("As the breeze whips straight as an arrow, let her go over Kill Devil Hill!");
         gso->Id = 50;
         gso->Icon = 1;
         gso->NpcFlag = 0;
