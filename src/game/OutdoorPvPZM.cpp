@@ -387,7 +387,7 @@ bool OutdoorPvPObjectiveZM_GraveYard::CanTalkTo(Player * plr, Creature * c, Goss
         }
         else if(itr->second == ZM_HORDE_FIELD_SCOUT && plr->GetTeam() == HORDE && m_BothControllingFaction == HORDE && !m_FlagCarrierGUID && m_GraveYardState != ZM_GRAVEYARD_H)
         {
-            gso.Option.assign("Give me the flag, I'll take it to the Central Tower for the glory of the Horde!");
+            gso.OptionText.assign("Give me the flag, I'll take it to the Central Tower for the glory of the Horde!");
             return true;
         }
     }
