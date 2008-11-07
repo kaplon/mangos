@@ -325,6 +325,22 @@ class Guild
             return ((GetRankRights(rankId) & right) != GR_RIGHT_EMPTY) ? true : false;
         }
         int32 GetRank(uint32 LowGuid);
+        bool IsMember(uint32 LowGuid)
+        {
+            return (members.find(LowGuid) != members.end());
+        }
+        MemberSlot* GetMemberSlot(std::string const& name, uint64& guid)
+        {
+            for(MemberList::iterator itr = members.begin(); itr != members.end(); ++itr)
+            {
+                if(itr->second.name == name)
+                {
+                    guid = itr->first;
+                    return &itr->second;
+                }
+            }
+            return NULL;
+        }
 
         void Roster(WorldSession *session);
         void Query(WorldSession *session);
