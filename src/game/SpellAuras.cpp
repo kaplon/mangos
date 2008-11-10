@@ -2569,7 +2569,8 @@ void Aura::HandleAuraModShapeshift(bool apply, bool Real)
     }
     else
     {
-        m_target->SetDisplayId(m_target->GetNativeDisplayId());
+        if(modelid > 0)
+            m_target->SetDisplayId(m_target->GetNativeDisplayId());
         m_target->SetByteValue(UNIT_FIELD_BYTES_2, 3, FORM_NONE);
         if(m_target->getClass() == CLASS_DRUID)
             m_target->setPowerType(POWER_MANA);
@@ -5630,7 +5631,7 @@ void Aura::PeriodicTick()
 
             // DO NOT ACCESS MEMBERS OF THE AURA FROM NOW ON (DealDamage can delete aura)
 
-            pCaster->ProcDamageAndSpell(target, PROC_FLAG_HIT_SPELL, PROC_FLAG_TAKE_DAMAGE, (pdamage <= absorb+resist) ? 0 : (pdamage-absorb-resist), GetSpellSchoolMask(spellProto), spellProto);
+            pCaster->ProcDamageAndSpell(target, PROC_FLAG_NONE, PROC_FLAG_TAKE_DAMAGE, (pdamage <= absorb+resist) ? 0 : (pdamage-absorb-resist), GetSpellSchoolMask(spellProto), spellProto);
             break;
         }
         case SPELL_AURA_PERIODIC_LEECH:
@@ -5743,7 +5744,7 @@ void Aura::PeriodicTick()
 
             // DO NOT ACCESS MEMBERS OF THE AURA FROM NOW ON (DealDamage can delete aura)
 
-            pCaster->ProcDamageAndSpell(target, PROC_FLAG_HIT_SPELL, PROC_FLAG_TAKE_DAMAGE, new_damage, GetSpellSchoolMask(spellProto), spellProto);
+            pCaster->ProcDamageAndSpell(target, PROC_FLAG_HEALED, PROC_FLAG_TAKE_DAMAGE, new_damage, GetSpellSchoolMask(spellProto), spellProto);
             if (!target->isAlive() && pCaster->IsNonMeleeSpellCasted(false))
             {
                 for (uint32 i = CURRENT_FIRST_NON_MELEE_SPELL; i < CURRENT_MAX_SPELL; i++)
@@ -5846,7 +5847,7 @@ void Aura::PeriodicTick()
 
             // ignore item heals
             if(procSpell && !haveCastItem)
-                pCaster->ProcDamageAndSpell(target,PROC_FLAG_HEAL, PROC_FLAG_HEALED, pdamage, SPELL_SCHOOL_MASK_NONE, spellProto);
+                pCaster->ProcDamageAndSpell(target,PROC_FLAG_NONE, PROC_FLAG_HEALED, pdamage, SPELL_SCHOOL_MASK_NONE, spellProto);
             break;
         }
         case SPELL_AURA_PERIODIC_MANA_LEECH:

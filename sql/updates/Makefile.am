@@ -123,6 +123,13 @@ pkgdata_DATA = \
 	2008_10_31_03_mangos_command.sql \
 	2008_11_01_01_mangos_mangos_string.sql \
 	2008_11_01_02_mangos_command.sql \
+	2008_11_07_01_characters_character_db_version.sql \
+	2008_11_07_02_realmd_realmd_db_version.sql \
+	2008_11_07_03_characters_guild_bank_tab.sql \
+	2008_11_07_04_realmd_account.sql \
+	2008_11_09_01_mangos_command.sql \
+	2008_11_09_02_mangos_command.sql \
+	2008_11_09_03_mangos_mangos_string.sql \
 	README
 
 ## Additional files to include when running 'make dist'
@@ -227,4 +234,11 @@ EXTRA_DIST = \
 	2008_10_31_03_mangos_command.sql \
 	2008_11_01_01_mangos_mangos_string.sql \
 	2008_11_01_02_mangos_command.sql \
+	2008_11_07_01_characters_character_db_version.sql \
+	2008_11_07_02_realmd_realmd_db_version.sql \
+	2008_11_07_03_characters_guild_bank_tab.sql \
+	2008_11_07_04_realmd_account.sql \
+	2008_11_09_01_mangos_command.sql \
+	2008_11_09_02_mangos_command.sql \
+	2008_11_09_03_mangos_mangos_string.sql \
 	README
