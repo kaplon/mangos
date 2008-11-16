@@ -562,6 +562,64 @@ bool Map::loaded(const GridPair &p) const
 
 void Map::Update(const uint32 &t_diff)
 {
+    resetMarkedCells();
+
+    MaNGOS::ObjectUpdater updater(t_diff);
+    // for creature
+    TypeContainerVisitor<MaNGOS::ObjectUpdater, GridTypeMapContainer  > grid_object_update(updater);
+    // for pets
+    TypeContainerVisitor<MaNGOS::ObjectUpdater, WorldTypeMapContainer > world_object_update(updater);
+
+    //TODO: Player guard
+    HashMapHolder<Player>::MapType& playerMap = HashMapHolder<Player>::GetContainer();
+    for(HashMapHolder<Player>::MapType::iterator iter = playerMap.begin(); iter != playerMap.end(); ++iter)
+    {
+        WorldObject* obj = iter->second;
+
+        if(!obj->IsInWorld())
+            continue;
+
+        if(obj->GetMapId() != GetId())
+            continue;
+
+        if(obj->GetInstanceId() != GetInstanceId())
+            continue;
+
+        CellPair standing_cell(MaNGOS::ComputeCellPair(obj->GetPositionX(), obj->GetPositionY()));
+
+        // Check for correctness of standing_cell, it also avoids problems with update_cell
+        if (standing_cell.x_coord >= TOTAL_NUMBER_OF_CELLS_PER_MAP || standing_cell.y_coord >= TOTAL_NUMBER_OF_CELLS_PER_MAP)
+            continue;
+
+        // the overloaded operators handle range checking
+        // so ther's no need for range checking inside the loop
+        CellPair begin_cell(standing_cell), end_cell(standing_cell);
+        begin_cell << 1; begin_cell -= 1;               // upper left
+        end_cell >> 1; end_cell += 1;                   // lower right
+
+        for(uint32 x = begin_cell.x_coord; x <= end_cell.x_coord; ++x)
+        {
+            for(uint32 y = begin_cell.y_coord; y <= end_cell.y_coord; ++y)
+            {
+                // marked cells are those that have been visited
+                // don't visit the same cell twice
+                uint32 cell_id = (y * TOTAL_NUMBER_OF_CELLS_PER_MAP) + x;
+                if(!isCellMarked(cell_id))
+                {
+                    markCell(cell_id);
+                    CellPair pair(x,y);
+                    Cell cell(pair);
+                    cell.data.Part.reserved = CENTER_DISTRICT;
+                    cell.SetNoCreate();
+                    CellLock<NullGuard> cell_lock(cell, pair);
+                    cell_lock->Visit(cell_lock, grid_object_update,  *this);
+                    cell_lock->Visit(cell_lock, world_object_update, *this);
+                }
+            }
+        }
+    }
+
+
     // Don't unload grids if it's battleground, since we may have manually added GOs,creatures, those doesn't load from DB at grid re-load !
     // This isn't really bother us, since as soon as we have instanced BG-s, the whole map unloads as the BG gets ended
     if (IsBattleGroundOrArena())
@@ -1568,7 +1626,7 @@ void InstanceMap::CreateInstanceData(bool load)
     InstanceTemplate const* mInstance = objmgr.GetInstanceTemplate(GetId());
     if (mInstance)
     {
-        i_script = mInstance->script;
+        i_script_id = mInstance->script_id;
         i_data = Script->CreateInstanceData(this);
     }
 
@@ -1585,7 +1643,7 @@ void InstanceMap::CreateInstanceData(bool load)
             const char* data = fields[0].GetString();
             if(data)
             {
-                sLog.outDebug("Loading instance data for `%s` with id %u", i_script.c_str(), i_InstanceId);
+                sLog.outDebug("Loading instance data for `%s` with id %u", objmgr.GetScriptName(i_script_id), i_InstanceId);
                 i_data->Load(data);
             }
             delete result;
@@ -1593,7 +1651,7 @@ void InstanceMap::CreateInstanceData(bool load)
     }
     else
     {
-        sLog.outDebug("New instance data, \"%s\" ,initialized!",i_script.c_str());
+        sLog.outDebug("New instance data, \"%s\" ,initialized!", objmgr.GetScriptName(i_script_id));
         i_data->Initialize();
     }
 }
