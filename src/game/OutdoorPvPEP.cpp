@@ -806,9 +806,9 @@ void OutdoorPvPEP::BuffTeams()
         if(Player * plr = objmgr.GetPlayer(*itr))
         {
             for(int i = 0; i < 4; ++i)
-                plr->RemoveAurasDueToSpell(EP_AllianceBuffs[i]);
+                if(plr->IsInWorld()) plr->RemoveAurasDueToSpell(EP_AllianceBuffs[i]);
             if(m_AllianceTowersControlled && m_AllianceTowersControlled < 5)
-                plr->CastSpell(plr,EP_AllianceBuffs[m_AllianceTowersControlled-1],true);
+                if(plr->IsInWorld()) plr->CastSpell(plr,EP_AllianceBuffs[m_AllianceTowersControlled-1],true);
         }
     }
     for(std::set<uint64>::iterator itr = m_PlayerGuids[1].begin(); itr != m_PlayerGuids[1].end(); ++itr)
@@ -816,9 +816,9 @@ void OutdoorPvPEP::BuffTeams()
         if(Player * plr = objmgr.GetPlayer(*itr))
         {
             for(int i = 0; i < 4; ++i)
-                plr->RemoveAurasDueToSpell(EP_HordeBuffs[i]);
+                if(plr->IsInWorld()) plr->RemoveAurasDueToSpell(EP_HordeBuffs[i]);
             if(m_HordeTowersControlled && m_HordeTowersControlled < 5)
-                plr->CastSpell(plr,EP_HordeBuffs[m_HordeTowersControlled-1],true);
+                if(plr->IsInWorld()) plr->CastSpell(plr,EP_HordeBuffs[m_HordeTowersControlled-1],true);
         }
     }
 }
