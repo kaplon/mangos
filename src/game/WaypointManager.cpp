@@ -22,20 +22,30 @@
 #include "WaypointManager.h"
 #include "ProgressBar.h"
 #include "MapManager.h"
+#include "ObjectMgr.h"
 
 INSTANTIATE_SINGLETON_1(WaypointManager);
 
 bool WaypointBehavior::isEmpty()
 {
-    return emote == 0 && spell == 0 && model1 == 0 && model2 == 0 && text[0].empty() &&
-        text[1].empty() && text[2].empty() && text[3].empty() && text[4].empty();
+    if (emote || spell || model1 || model2)
+        return false;
+
+    for(int i = 0; i < MAX_WAYPOINT_TEXT; ++i)
+        if(textid[i])
+            return false;
+
+    return true;
 }
 
 WaypointBehavior::WaypointBehavior(const WaypointBehavior &b)
 {
-    emote = b.emote; spell = b.spell; model1 = b.model1; model2 = b.model2;
-    text[0] = b.text[0]; text[1] = b.text[1]; text[2] = b.text[2];
-    text[3] = b.text[3]; text[4] = b.text[4];
+    emote = b.emote;
+    spell = b.spell;
+    model1 = b.model1;
+    model2 = b.model2;
+    for(int i=0; i < MAX_WAYPOINT_TEXT; ++i)
+        textid[i] = b.textid[i];
 }
 
 void WaypointManager::Load()
@@ -64,7 +74,7 @@ void WaypointManager::Load()
         delete result;
     }
 
-    result = WorldDatabase.Query("SELECT position_x, position_y, position_z, orientation, model1, model2, waittime, emote, spell, text1, text2, text3, text4, text5, id, point FROM creature_movement");
+    result = WorldDatabase.Query("SELECT position_x, position_y, position_z, orientation, model1, model2, waittime, emote, spell, textid1, textid2, textid3, textid4, textid5, id, point FROM creature_movement");
     if(result)
     {
         barGoLink bar( result->GetRowCount() );
@@ -111,11 +121,19 @@ void WaypointManager::Load()
             be.model2           = fields[5].GetUInt32();
             be.emote            = fields[7].GetUInt32();
             be.spell            = fields[8].GetUInt32();
-            be.text[0]          = fields[9].GetCppString();
-            be.text[1]          = fields[10].GetCppString();
-            be.text[2]          = fields[11].GetCppString();
-            be.text[3]          = fields[12].GetCppString();
-            be.text[4]          = fields[13].GetCppString();
+
+            for(int i = 0; i < MAX_WAYPOINT_TEXT; ++i)
+            {
+                be.textid[i]        = fields[9+i].GetUInt32();
+                if(be.textid[i])
+                {
+                    if (be.textid[i] < MIN_DB_SCRIPT_STRING_ID || be.textid[i] >= MAX_DB_SCRIPT_STRING_ID)
+                    {
+                        sLog.outErrorDb( "Table `db_script_string` not have string id  %u", be.textid[i]);
+                        continue;
+                    }
+                }
+            }
 
             // save memory by not storing empty behaviors
             if(!be.isEmpty())
@@ -263,14 +281,60 @@ void WaypointManager::SetNodeText(uint32 id, uint32 point, const char *text_fiel
         WaypointNode &node = itr->second[point-1];
         if(!node.behavior) node.behavior = new WaypointBehavior();
 
-        if(field == "text1") node.behavior->text[0] = text ? text : "";
-        if(field == "text2") node.behavior->text[1] = text ? text : "";
-        if(field == "text3") node.behavior->text[2] = text ? text : "";
-        if(field == "text4") node.behavior->text[3] = text ? text : "";
-        if(field == "text5") node.behavior->text[4] = text ? text : "";
+//        if(field == "text1") node.behavior->text[0] = text ? text : "";
+//        if(field == "text2") node.behavior->text[1] = text ? text : "";
+//        if(field == "text3") node.behavior->text[2] = text ? text : "";
+//        if(field == "text4") node.behavior->text[3] = text ? text : "";
+//        if(field == "text5") node.behavior->text[4] = text ? text : "";
         if(field == "emote") node.behavior->emote   = text ? atoi(text) : 0;
         if(field == "spell") node.behavior->spell   = text ? atoi(text) : 0;
         if(field == "model1") node.behavior->model1 = text ? atoi(text) : 0;
         if(field == "model2") node.behavior->model2 = text ? atoi(text) : 0;
+    }
+}
+
+void WaypointManager::CheckTextsExistance(std::set<int32>& ids)
+{
+    WaypointPathMap::iterator pmItr = m_pathMap.begin();
+    for ( ; pmItr != m_pathMap.end(); ++pmItr)
+    {
+        for (int i = 0; i < pmItr->second.size(); ++i)
+        {
+            if (!pmItr->second[i].behavior)
+                continue;
+
+            // Now we check text existence and put all zero texts ids to the end of array
+
+            // Counting leading zeros for futher textid shift
+            int zeroCount = 0;
+            for (int j = 0; j < MAX_WAYPOINT_TEXT; ++j)
+            {
+                if (!pmItr->second[i].behavior->textid[j])
+                {
+                    ++zeroCount;
+                    continue;
+                }
+                else
+                {
+                    if (!objmgr.GetMangosStringLocale(pmItr->second[i].behavior->textid[j]))
+                    {
+                        sLog.outErrorDb("ERROR: Some waypoint has textid%u with not existing %u text.", j, pmItr->second[i].behavior->textid[j]);
+                        pmItr->second[i].behavior->textid[j] = 0;
+                        ++zeroCount;
+                        continue;
+                    }
+                    else
+                        ids.erase(pmItr->second[i].behavior->textid[j]);
+
+                    // Shifting check
+                    if (zeroCount)
+                    {
+                        // Correct textid but some zeros leading, so move it forward.
+                        pmItr->second[i].behavior->textid[j-zeroCount] = pmItr->second[i].behavior->textid[j];
+                        pmItr->second[i].behavior->textid[j] = 0;
+                    }
+                }
+            }
+        }
     }
 }

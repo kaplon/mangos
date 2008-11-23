@@ -5152,16 +5152,16 @@ bool Player::SetPosition(float x, float y, float z, float orientation, bool tele
         x = GetPositionX();
         y = GetPositionY();
         z = GetPositionZ();
+
+        // group update
+        if(GetGroup() && (old_x != x || old_y != y))
+            SetGroupUpdateFlag(GROUP_UPDATE_FLAG_POSITION);
     }
 
     // code block for underwater state update
     UpdateUnderwaterState(m, x, y, z);
 
     CheckExploreSystem();
-
-    // group update
-    if(GetGroup())
-        SetGroupUpdateFlag(GROUP_UPDATE_FLAG_POSITION);
 
     return true;
 }
@@ -11740,7 +11740,7 @@ void Player::SendPreparedQuest( uint64 guid )
             else if( status == DIALOG_STATUS_INCOMPLETE )
                 PlayerTalkClass->SendQuestGiverRequestItems( pQuest, guid, false, true );
             // Send completable on repeatable quest if player don't have quest
-            else if( pQuest->IsRepeatable() )
+            else if( pQuest->IsRepeatable() && !pQuest->IsDaily() )
                 PlayerTalkClass->SendQuestGiverRequestItems( pQuest, guid, CanCompleteRepeatableQuest(pQuest), true );
             else
                 PlayerTalkClass->SendQuestGiverQuestDetails( pQuest, guid, true );
@@ -11982,7 +11982,7 @@ bool Player::CanRewardQuest( Quest const *pQuest, bool msg )
     if(!pQuest->IsAutoComplete() && GetQuestStatus(pQuest->GetQuestId()) != QUEST_STATUS_COMPLETE)
         return false;
 
-    // daily quest can't be rewarded (10 daily quest already completed)
+    // daily quest can't be rewarded (25 daily quest already completed)
     if(!SatisfyQuestDay(pQuest,true))
         return false;
 
@@ -12582,6 +12582,15 @@ bool Player::SatisfyQuestExclusiveGroup( Quest const* qInfo, bool msg )
         // skip checked quest id, only state of other quests in group is interesting
         if(exclude_Id == qInfo->GetQuestId())
             continue;
+
+        // not allow have daily quest if daily quest from exclusive group already recently completed
+        Quest const* Nquest = objmgr.GetQuestTemplate(exclude_Id);
+        if( !SatisfyQuestDay(Nquest, false) )
+        {
+            if( msg )
+                SendCanTakeQuestResponse( INVALIDREASON_DONT_HAVE_REQ );
+            return false;
+        }
 
         QuestStatusMap::iterator i_exstatus = mQuestStatus.find( exclude_Id );
 
@@ -14429,7 +14438,8 @@ void Player::_LoadQuestStatus(QueryResult *result)
                 // add to quest log
                 if( slot < MAX_QUEST_LOG_SIZE &&
                     ( questStatusData.m_status==QUEST_STATUS_INCOMPLETE ||
-                    questStatusData.m_status==QUEST_STATUS_COMPLETE && !questStatusData.m_rewarded ) )
+                    questStatusData.m_status==QUEST_STATUS_COMPLETE &&
+                    (!questStatusData.m_rewarded || pQuest->IsDaily()) ) )
                 {
                     SetQuestSlot(slot,quest_id,quest_time);
 

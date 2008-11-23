@@ -23,11 +23,12 @@
 #include <string>
 #include "Utilities/UnorderedMap.h"
 
+#define MAX_WAYPOINT_TEXT 5
 struct WaypointBehavior
 {
     uint32 emote;
     uint32 spell;
-    std::string text[5];
+    int32  textid[MAX_WAYPOINT_TEXT];
     uint32 model1;
     uint32 model2;
 
@@ -75,6 +76,7 @@ class WaypointManager
         void DeletePath(uint32 id);
         void SetNodePosition(uint32 id, uint32 point, float x, float y, float z);
         void SetNodeText(uint32 id, uint32 point, const char *text_field, const char *text);
+        void CheckTextsExistance(std::set<int32>& ids);
 
     private:
         void _addNode(uint32 id, uint32 point, float x, float y, float z, float o, uint32 delay, uint32 wpGuid);
