@@ -842,6 +842,7 @@ class ObjectMgr
         int GetOrNewIndexForLocale(LocaleConstant loc);
 
         int DBCLocaleIndex;
+
     private:
         void LoadScripts(ScriptMapMap& scripts, char const* tablename);
         void CheckScripts(ScriptMapMap const& scripts,std::set<int32>& ids);

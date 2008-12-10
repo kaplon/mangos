@@ -126,6 +126,9 @@ World::~World()
 
     m_weathers.clear();
 
+    while (!cliCmdQueue.empty())
+        delete cliCmdQueue.next();
+
     VMAP::VMapFactory::clear();
 
     if(m_resultQueue) delete m_resultQueue;
