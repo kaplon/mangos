@@ -36,7 +36,8 @@
 #include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "BattleGroundMgr.h"
-#include "Language.h"                                       // for CMSG_CANCEL_MOUNT_AURA handler
+#include "OutdoorPvPMgr.h"
+#include "Language.h"                                       // for CMSG_DISMOUNT handler
 #include "Chat.h"
 #include "SocialMgr.h"
 
@@ -306,6 +307,8 @@ void WorldSession::LogoutPlayer(bool Save)
         ///- Remove player from battleground (teleport to entrance)
         if(_player->InBattleGround())
             _player->LeaveBattleground();
+
+        sOutdoorPvPMgr.HandlePlayerLeaveZone(_player,_player->GetZoneId());
 
         for (int i=0; i < PLAYER_MAX_BATTLEGROUND_QUEUES; i++)
         {

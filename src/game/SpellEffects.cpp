@@ -48,6 +48,7 @@
 #include "BattleGround.h"
 #include "BattleGroundEY.h"
 #include "BattleGroundWS.h"
+#include "OutdoorPvPMgr.h"
 #include "VMapFactory.h"
 #include "Language.h"
 #include "SocialMgr.h"
@@ -2915,6 +2916,10 @@ void Spell::EffectOpenLock(uint32 /*i*/)
                 return;
             }
         }
+        // handle outdoor pvp object opening, return true if go was registered for handling
+        // these objects must have been spawned by outdoorpvp!
+        else if(gameObjTarget->GetGOInfo()->type == GAMEOBJECT_TYPE_GOOBER && sOutdoorPvPMgr.HandleOpenGo(player, gameObjTarget->GetGUID()))
+            return;
         lockId = gameObjTarget->GetLockId();
         guid = gameObjTarget->GetGUID();
     }

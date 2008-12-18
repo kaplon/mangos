@@ -46,6 +46,7 @@ class PlayerMenu;
 class Transport;
 class UpdateMask;
 class PlayerSocial;
+class OutdoorPvP;
 
 typedef std::deque<Mail*> PlayerMails;
 
@@ -1777,7 +1778,7 @@ class MANGOS_DLL_SPEC Player : public Unit
         void UpdateEquipSpellsAtFormChange();
         void CastItemCombatSpell(Item *item,Unit* Target, WeaponAttackType attType);
 
-        void SendInitWorldStates();
+        void SendInitWorldStates(bool force = false, uint32 forceZoneId = 0);
         void SendUpdateWorldState(uint32 Field, uint32 Value);
         void SendDirectMessage(WorldPacket *data);
 
@@ -1903,6 +1904,14 @@ class MANGOS_DLL_SPEC Player : public Unit
 
         bool GetBGAccessByLevel(uint32 bgTypeId) const;
         bool isAllowUseBattleGroundObject();
+
+        /*********************************************************/
+        /***               OUTDOOR PVP SYSTEM                  ***/
+        /*********************************************************/
+
+        OutdoorPvP * GetOutdoorPvP() const;
+        // returns true if the player is in active state for outdoor pvp objective capturing, false otherwise
+        bool IsOutdoorPvPActive();
 
         /*********************************************************/
         /***                    REST SYSTEM                    ***/

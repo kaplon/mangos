@@ -38,6 +38,7 @@
 #include "ObjectAccessor.h"
 #include "Object.h"
 #include "BattleGround.h"
+#include "OutdoorPvP.h"
 #include "SpellAuras.h"
 #include "Pet.h"
 #include "SocialMgr.h"
@@ -373,6 +374,11 @@ void WorldSession::HandleTogglePvP( WorldPacket & recv_data )
         if(!GetPlayer()->pvpInfo.inHostileArea && GetPlayer()->IsPvP())
             GetPlayer()->pvpInfo.endTimer = time(NULL);     // start toggle-off
     }
+
+    if(OutdoorPvP * pvp = _player->GetOutdoorPvP())
+    {
+        pvp->HandlePlayerActivityChanged(_player);
+    }
 }
 
 void WorldSession::HandleZoneUpdateOpcode( WorldPacket & recv_data )
@@ -384,10 +390,13 @@ void WorldSession::HandleZoneUpdateOpcode( WorldPacket & recv_data )
 
     sLog.outDetail("WORLD: Recvd ZONE_UPDATE: %u", newZone);
 
-    if(newZone != _player->GetZoneId())
-        GetPlayer()->SendInitWorldStates();                 // only if really enters to new zone, not just area change, works strange...
-
+    // this check is definitely BAD, either we init for the old zone, or we doesn't init at all.
+    // Let's try with check commented out. Let the client decide when to re-init states.
+    // EDIT: and this works like a charm.
+//    if(newZone != _player->GetZoneId())
     GetPlayer()->UpdateZone(newZone);
+
+    GetPlayer()->SendInitWorldStates(true,newZone);                 // only if really enters to new zone, not just area change, works strange...
 }
 
 void WorldSession::HandleSetTargetOpcode( WorldPacket & recv_data )
@@ -819,6 +828,12 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPacket & recv_data)
                 bg->HandleAreaTrigger(GetPlayer(), Trigger_ID);
 
         return;
+    }
+
+    if(OutdoorPvP * pvp = GetPlayer()->GetOutdoorPvP())
+    {
+        if(pvp->HandleAreaTrigger(_player, Trigger_ID))
+            return;
     }
 
     // NULL if all values default (non teleport trigger)
