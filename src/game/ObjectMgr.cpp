@@ -578,7 +578,7 @@ void ObjectMgr::LoadCreatureLocales()
     sLog.outString();
     sLog.outString( ">> Loaded %u creature locale strings", mCreatureLocaleMap.size() );
 }
-   
+
 void ObjectMgr::LoadNpcOptionLocales()
 {
     mNpcOptionLocaleMap.clear();                              // need for reload case
@@ -2099,6 +2099,8 @@ void ObjectMgr::LoadPlayerInfo()
         if (!result)
         {
             barGoLink bar( 1 );
+
+            bar.step();
 
             sLog.outString();
             sLog.outString( ">> Loaded %u custom player create items", count );
