@@ -568,8 +568,8 @@ void Object::_BuildValuesUpdate(uint8 updatetype, ByteBuffer * data, UpdateMask 
                 IsActivateToQuest = true;
                 updateMask->SetBit(GAMEOBJECT_DYNAMIC);
             }
-            if (GetUInt32Value(GAMEOBJECT_ARTKIT))
-                updateMask->SetBit(GAMEOBJECT_ARTKIT);
+            if (GetUInt32Value(GAMEOBJECT_BYTES_1))
+                updateMask->SetBit(GAMEOBJECT_BYTES_1);
         }
     }
     else                                                    //case UPDATETYPE_VALUES

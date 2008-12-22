@@ -159,7 +159,7 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
 
     SetGoAnimProgress(animprogress);
 
-    SetUInt32Value (GAMEOBJECT_ARTKIT, ArtKit);
+    SetUInt32Value (GAMEOBJECT_BYTES_1, ArtKit);
 
     // Spell charges for GAMEOBJECT_TYPE_SPELLCASTER (22)
     if (goinfo->type == GAMEOBJECT_TYPE_SPELLCASTER)
@@ -537,7 +537,7 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask)
     data.animprogress = GetGoAnimProgress();
     data.go_state = GetGoState();
     data.spawnMask = spawnMask;
-    data.ArtKit = GetUInt32Value (GAMEOBJECT_ARTKIT);
+    data.ArtKit = GetUInt32Value (GAMEOBJECT_BYTES_1);
 
     // updated in DB
     std::ostringstream ss;
@@ -848,14 +848,6 @@ void GameObject::UseDoorOrButton(uint32 time_to_restore)
 
     m_cooldownTime = time(NULL) + time_to_restore;
 
-}
-
-void GameObject::SetGoArtKit(uint32 kit)
-{
-    SetUInt32Value(GAMEOBJECT_ARTKIT, kit);
-    GameObjectData *data = const_cast<GameObjectData*>(objmgr.GetGOData(m_DBTableGuid));
-    if(data)
-        data->ArtKit = kit;
 }
 
 void GameObject::SwitchDoorOrButton(bool activate)
