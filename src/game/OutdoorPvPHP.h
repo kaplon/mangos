@@ -46,11 +46,11 @@ const uint32 HP_MAP_A[HP_TOWER_NUM] = {0x9b3,0x9b0,0x9a7};
 
 const uint32 HP_MAP_H[HP_TOWER_NUM] = {0x9b4,0x9b1,0x9a6};
 
-const uint32 HP_TowerArtKit_A[HP_TOWER_NUM] = {65,62,67};
+const uint8 HP_TowerArtKit_A[HP_TOWER_NUM] = {65,62,67};
 
-const uint32 HP_TowerArtKit_H[HP_TOWER_NUM] = {64,61,68};
+const uint8 HP_TowerArtKit_H[HP_TOWER_NUM] = {64,61,68};
 
-const uint32 HP_TowerArtKit_N[HP_TOWER_NUM] = {66,63,69};
+const uint8 HP_TowerArtKit_N[HP_TOWER_NUM] = {66,63,69};
 
 const go_type HPCapturePoints[HP_TOWER_NUM] = {
     {182175,530,-471.462,3451.09,34.6432,0.174533,0,0,0.087156,0.996195},      // 0 - Broken Hill
