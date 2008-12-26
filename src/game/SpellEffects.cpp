@@ -3288,7 +3288,7 @@ void Spell::EffectSummon(uint32 i)
     uint32 level = m_caster->getLevel();
     Pet* spawnCreature = new Pet(SUMMON_PET);
 
-    if(spawnCreature->LoadPetFromDB(m_caster,pet_entry))
+    if(m_caster->GetTypeId()==TYPEID_PLAYER && spawnCreature->LoadPetFromDB((Player*)m_caster,pet_entry))
     {
         // set timer for unsummon
         int32 duration = GetSpellDuration(m_spellInfo);
@@ -4104,7 +4104,7 @@ void Spell::EffectSummonPet(uint32 i)
     Pet* NewSummon = new Pet;
 
     // petentry==0 for hunter "call pet" (current pet summoned if any)
-    if(NewSummon->LoadPetFromDB(m_caster,petentry))
+    if(m_caster->GetTypeId() == TYPEID_PLAYER && NewSummon->LoadPetFromDB((Player*)m_caster,petentry))
     {
         if(NewSummon->getPetType()==SUMMON_PET)
         {
@@ -4189,7 +4189,8 @@ void Spell::EffectSummonPet(uint32 i)
     // this enables pet details window (Shift+P)
 
     // this enables popup window (pet dismiss, cancel), hunter pet additional flags set later
-    NewSummon->SetUInt32Value(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
+    if(m_caster->GetTypeId() == TYPEID_PLAYER)
+        NewSummon->SetUInt32Value(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
 
     NewSummon->InitStatsForLevel(petlevel);
     NewSummon->InitPetCreateSpells();
@@ -5416,7 +5417,9 @@ void Spell::EffectSummonTotem(uint32 i)
     }
 
     pTotem->SetUInt32Value(UNIT_CREATED_BY_SPELL,m_spellInfo->Id);
-    pTotem->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
+
+    if(m_caster->GetTypeId() == TYPEID_PLAYER)
+        pTotem->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
 
     pTotem->ApplySpellImmune(m_spellInfo->Id,IMMUNITY_STATE,SPELL_AURA_MOD_FEAR,true);
     pTotem->ApplySpellImmune(m_spellInfo->Id,IMMUNITY_STATE,SPELL_AURA_TRANSFORM,true);
