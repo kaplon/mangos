@@ -188,7 +188,7 @@ bool OutdoorPvPObjectiveHP::Update(uint32 diff)
                 field = 0;
             }
             uint8 artkit = 21;
-            uint32 artkit2 = HP_TowerArtKit_N[m_TowerType];
+            uint8 artkit2 = HP_TowerArtKit_N[m_TowerType];
             switch(m_State)
             {
             case OBJECTIVESTATE_NEUTRAL:
