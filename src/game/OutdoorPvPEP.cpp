@@ -34,7 +34,7 @@ bool OutdoorPvPObjectiveEP_EWT::Update(uint32 diff)
                 ((OutdoorPvPEP*)m_PvP)->EP_Controls[EP_EWT] = 0;
             }
 
-            uint32 artkit = 21;
+            uint8 artkit = 21;
 
             switch(m_State)
             {
@@ -208,7 +208,7 @@ bool OutdoorPvPObjectiveEP_NPT::Update(uint32 diff)
                 ((OutdoorPvPEP*)m_PvP)->EP_Controls[EP_NPT] = 0;
             }
 
-            uint32 artkit = 21;
+            uint8 artkit = 21;
 
             switch(m_State)
             {
@@ -378,7 +378,7 @@ bool OutdoorPvPObjectiveEP_CGT::Update(uint32 diff)
                 ((OutdoorPvPEP*)m_PvP)->EP_Controls[EP_CGT] = 0;
             }
 
-            uint32 artkit = 21;
+            uint8 artkit = 21;
 
             switch(m_State)
             {
@@ -547,7 +547,7 @@ bool OutdoorPvPObjectiveEP_PWT::Update(uint32 diff)
                 ((OutdoorPvPEP*)m_PvP)->EP_Controls[EP_PWT] = 0;
             }
 
-            uint32 artkit = 21;
+            uint8 artkit = 21;
 
             switch(m_State)
             {

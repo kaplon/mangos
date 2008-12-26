@@ -90,7 +90,7 @@ void GameObject::RemoveFromWorld()
     Object::RemoveFromWorld();
 }
 
-bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 animprogress, uint32 go_state, uint32 ArtKit)
+bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 animprogress, uint32 go_state, uint8 ArtKit)
 {
     Relocate(x,y,z,ang);
     SetMapId(map->GetId());
@@ -159,7 +159,7 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
 
     SetGoAnimProgress(animprogress);
 
-    SetUInt32Value (GAMEOBJECT_BYTES_1, ArtKit);
+    SetGoArtKit(ArtKit);
 
     // Spell charges for GAMEOBJECT_TYPE_SPELLCASTER (22)
     if (goinfo->type == GAMEOBJECT_TYPE_SPELLCASTER)
@@ -537,7 +537,7 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask)
     data.animprogress = GetGoAnimProgress();
     data.go_state = GetGoState();
     data.spawnMask = spawnMask;
-    data.ArtKit = GetUInt32Value (GAMEOBJECT_BYTES_1);
+    data.ArtKit = GetGoArtKit();
 
     // updated in DB
     std::ostringstream ss;
@@ -588,7 +588,7 @@ bool GameObject::LoadFromDB(uint32 guid, Map *map)
 
     uint32 animprogress = data->animprogress;
     uint32 go_state = data->go_state;
-    uint32 ArtKit = data->ArtKit;
+    uint8 ArtKit = data->ArtKit;
 
     m_DBTableGuid = guid;
     if (map->GetInstanceId() != 0) guid = objmgr.GenerateLowGuid(HIGHGUID_GAMEOBJECT);
