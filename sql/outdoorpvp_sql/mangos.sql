@@ -12,8 +12,9 @@ DELETE FROM creature WHERE id IN (18816,18821,21474,21484,21483,18192,18817,1882
 UPDATE creature_template SET RegenHealth = 0 WHERE entry IN (18192,18256);
 -- 
 UPDATE creature_template SET faction_A = 1630, faction_H = 1630, ScriptName = 'mob_eventai' WHERE entry = 18225;
+
 -- pvp flag
-UPDATE creature_template SET flags = flags | 0x1000 WHERE entry IN (18816,18821,21474,21484,21483,18192,18817,18822,21485,21487,21488,18256);
+UPDATE creature_template SET unit_flags = unit_flags | 0x1000 WHERE entry IN (18816,18821,21474,21484,21483,18192,18817,18822,21485,21487,21488,18256);
 
 -- faction changes
 -- (destroyed) wyvern posts
@@ -27,31 +28,27 @@ UPDATE gameobject_template SET data0 = 0 WHERE entry IN (181598, 181597); -- wit
 UPDATE gameobject_template SET data0 = 0 WHERE entry = 181682;
 
 DELETE from gameobject WHERE id = 181682; -- DELETE the go that is spawned by the opvp
-
 DELETE from creature WHERE id = 17209; -- DELETE the flight master that is spawned by the opvp
 
 UPDATE creature_template SET faction_a = 83, faction_h = 83 WHERE entry = 17995; -- horde guards faction
 UPDATE creature_template SET faction_a = 83, faction_h = 83 WHERE entry = 17996; 
-
 UPDATE creature_template SET faction_a = 84, faction_h = 84 WHERE entry = 17635; -- ally guards faction
 UPDATE creature_template SET faction_a = 84, faction_h = 84 WHERE entry = 17647;
-
 UPDATE creature_template SET faction_a = 84, faction_h = 83 WHERE entry = 17209; -- flight master
+UPDATE creature_template SET AIName = 'OutdoorPvPObjectiveAI', ScriptName = '' WHERE entry = 12999;
+UPDATE creature_template SET npcflag = npcflag | 536870912 WHERE entry IN (18564, 18581);
 
 DELETE FROM game_graveyard_zone WHERE id IN (969, 927, 993); -- DELETE na, za, epl pvp graveyard associations, they should only be available to the controlling faction
 
 UPDATE quest_template SET ReqSpellCast1 = 0, ReqSpellCast2 = 0, ReqSpellCast3 = 0, ReqSpellCast4 = 0 WHERE entry IN (9665, 9664); -- fix quests IN epl
+UPDATE quest_template SET reqspellcast1 = 0, reqspellcast2 = 0, reqspellcast3 = 0, reqspellcast4 = 0 WHERE entry in(9664,9665);
 
 DELETE FROM gameobject WHERE id IN (181899, 182096, 182097, 182173, 182174, 182175, 182210, 182522, 182523, 183104, 183411, 183412, 183413, 183414, 182098);
-
 DELETE FROM creature WHERE id IN (18564, 18581);
-
-UPDATE creature_template SET npcflag = npcflag | 536870912 WHERE entry IN (18564, 18581);
 
 DELETE FROM npc_option WHERE id = 51;
 INSERT INTO npc_option(id, gossip_id, npcflag, icon, action, option_text) VALUES (51,0,536870912,0,18,"UNIT_NPC_FLAG_OUTDOORPVP");
 
-UPDATE quest_template SET reqspellcast1 = 0, reqspellcast2 = 0, reqspellcast3 = 0, reqspellcast4 = 0 WHERE entry in(9664,9665);
 
 DELETE FROM `mangos_string` WHERE `entry` BETWEEN 9001 AND 9050;
 INSERT INTO `mangos_string` (`entry`, `content_default`) VALUES
@@ -111,5 +108,3 @@ INSERT INTO `mangos_string` (`entry`, `content_default`) VALUES
 -- silithus
 (9049,'The Horde has collected 200 silithyst!'),
 (9050,'The Alliance has collected 200 silithyst!');
-
-UPDATE creature_template SET AIName = 'OutdoorPvPObjectiveAI', ScriptName = '' WHERE entry = 12999;
