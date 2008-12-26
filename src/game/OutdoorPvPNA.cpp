@@ -142,9 +142,9 @@ void OutdoorPvPObjectiveNA::SpawnGOsForTeam(uint32 team)
             i == NA_ROOST_W ||
             i == NA_ROOST_N ||
             i == NA_ROOST_E ||
-            i == NA_BOMB_WAGON_S || 
-            i == NA_BOMB_WAGON_W || 
-            i == NA_BOMB_WAGON_N || 
+            i == NA_BOMB_WAGON_S ||
+            i == NA_BOMB_WAGON_W ||
+            i == NA_BOMB_WAGON_N ||
             i == NA_BOMB_WAGON_E )
             continue;   // roosts and bomb wagons are spawned when someone uses the matching destroyed roost
         AddObject(i,gos[i].entry,gos[i].map,gos[i].x,gos[i].y,gos[i].z,gos[i].o,gos[i].rot0,gos[i].rot1,gos[i].rot2,gos[i].rot3);
@@ -226,7 +226,7 @@ void OutdoorPvPObjectiveNA::HandlePlayerLeave(Player *plr)
     OutdoorPvPObjective::HandlePlayerLeave(plr);
 }
 
-OutdoorPvPObjectiveNA::OutdoorPvPObjectiveNA(OutdoorPvP *pvp) : 
+OutdoorPvPObjectiveNA::OutdoorPvPObjectiveNA(OutdoorPvP *pvp) :
 OutdoorPvPObjective(pvp), m_capturable(true), m_GuardsAlive(0), m_ControllingFaction(0),
 m_HalaaState(HALAA_N), m_WyvernStateSouth(0), m_WyvernStateNorth(0), m_WyvernStateWest(0),
 m_WyvernStateEast(0), m_RespawnTimer(NA_RESPAWN_TIME), m_GuardCheckTimer(NA_GUARD_CHECK_TIME)
@@ -318,7 +318,7 @@ void OutdoorPvPObjectiveNA::FillInitialWorldStates(WorldPacket &data)
     data << NA_MAP_HALAA_NEU_A << uint32(bool(m_HalaaState & HALAA_N_A));
     data << NA_MAP_HALAA_NEU_H << uint32(bool(m_HalaaState & HALAA_N_H));
     data << NA_MAP_HALAA_HORDE << uint32(bool(m_HalaaState & HALAA_H));
-    data << NA_MAP_HALAA_ALLIANCE << uint32(bool(m_HalaaState & HALAA_A)); 
+    data << NA_MAP_HALAA_ALLIANCE << uint32(bool(m_HalaaState & HALAA_A));
 }
 
 void OutdoorPvPNA::SendRemoveWorldStates(Player *plr)
@@ -350,7 +350,7 @@ void OutdoorPvPNA::SendRemoveWorldStates(Player *plr)
     plr->SendUpdateWorldState(NA_MAP_HALAA_NEU_A,0);
     plr->SendUpdateWorldState(NA_MAP_HALAA_NEU_H,0);
     plr->SendUpdateWorldState(NA_MAP_HALAA_HORDE,0);
-    plr->SendUpdateWorldState(NA_MAP_HALAA_ALLIANCE,0); 
+    plr->SendUpdateWorldState(NA_MAP_HALAA_ALLIANCE,0);
 }
 
 bool OutdoorPvPNA::Update(uint32 diff)
@@ -407,7 +407,7 @@ bool OutdoorPvPObjectiveNA::HandleCustomSpell(Player * plr, uint32 spellId, Game
         uint32 noSpaceForCount = 0;
 
         // check space and find places
-        ItemPosCountVec dest;                           
+        ItemPosCountVec dest;
 
         int32 count = 10;
         uint32 itemid = 24538;
