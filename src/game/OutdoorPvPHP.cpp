@@ -187,7 +187,7 @@ bool OutdoorPvPObjectiveHP::Update(uint32 diff)
                 m_PvP->SendUpdateWorldState(field, 0);
                 field = 0;
             }
-            uint32 artkit = 21;
+            uint8 artkit = 21;
             uint32 artkit2 = HP_TowerArtKit_N[m_TowerType];
             switch(m_State)
             {

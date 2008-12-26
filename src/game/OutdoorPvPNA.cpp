@@ -591,7 +591,7 @@ bool OutdoorPvPObjectiveNA::Update(uint32 diff)
 
         if(m_OldState != m_State)
         {
-            uint32 artkit = 21;
+            uint8 artkit = 21;
             switch(m_State)
             {
             case OBJECTIVESTATE_NEUTRAL:

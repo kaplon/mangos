@@ -295,7 +295,7 @@ bool OutdoorPvPObjectiveTF::Update(uint32 diff)
                 sWorld.SendZoneText(OutdoorPvPTFBuffZones[0],objmgr.GetMangosString(LANG_OPVP_TF_LOOSE_H,-1));
             }
 
-            uint32 artkit = 21;
+            uint8 artkit = 21;
 
             switch(m_State)
             {
