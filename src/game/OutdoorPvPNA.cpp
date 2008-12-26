@@ -207,17 +207,13 @@ void OutdoorPvPObjectiveNA::FactionTakeOver(uint32 team)
     ((OutdoorPvPNA*)m_PvP)->BuffTeam(team);
 }
 
-bool OutdoorPvPObjectiveNA::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveNA::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(NA_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveNA::HandlePlayerLeave(Player *plr)

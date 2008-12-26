@@ -228,7 +228,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
     bool HandleCustomSpell(Player *plr, uint32 spellId, GameObject * go);
     int32 HandleOpenGo(Player *plr, uint64 guid);

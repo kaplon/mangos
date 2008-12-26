@@ -15,9 +15,9 @@ m_State(0), m_OldState(0), m_CapturePoint(0), m_NeutralValue(0), m_ShiftMaxCaptu
 {
 }
 
-bool OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
+void OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
 {
-    // only called if really entered, so no use in the return value anymore
+    // only called if really entered
     // player distance and activity state was checked already in the AI
     std::set<uint64>::iterator pitr = m_ActivePlayerGuids.find(plr->GetGUID());
     // if not already counted as active, add player
@@ -29,9 +29,7 @@ bool OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
             ++m_HordeActivePlayerCount;
         m_ActivePlayerGuids.insert(plr->GetGUID());
         sLog.outDebug("player %u entered an outdoorpvpobjective", plr->GetGUIDLow());
-        return true;
     }
-    return true;
 }
 
 void OutdoorPvPObjective::HandlePlayerLeave(Player * plr)

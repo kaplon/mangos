@@ -76,7 +76,7 @@ public:
     virtual void SendObjectiveComplete(uint32 id, uint64 guid);
 
     // used when player is activated/inactivated in the area
-    virtual bool HandlePlayerEnter(Player * plr);
+    virtual void HandlePlayerEnter(Player * plr);
     virtual void HandlePlayerLeave(Player * plr);
     virtual void HandlePlayerActivityChanged(Player * plr);
 
