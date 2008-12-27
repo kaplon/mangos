@@ -204,6 +204,8 @@ libmangosgame_a_SOURCES = \
     OutdoorPvPTF.h \
     OutdoorPvPZM.cpp \
     OutdoorPvPZM.h \
+    OutdoorPvPLA.cpp \
+    OutdoorPvPLA.h \
     Path.h \
     PetAI.cpp \
     PetAI.h \
