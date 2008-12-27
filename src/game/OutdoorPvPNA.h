@@ -77,7 +77,7 @@ enum OutdoorPvPNAWorldStates{
     NA_MAP_HALAA_NEU_A = 2676,
     NA_MAP_HALAA_NEU_H = 2677,
     NA_MAP_HALAA_HORDE = 2672,
-    NA_MAP_HALAA_ALLIANCE = 2673 
+    NA_MAP_HALAA_ALLIANCE = 2673
 };
 
 const uint32 FLIGHT_NODES_NUM = 4;
@@ -94,8 +94,8 @@ enum ControlGOTypes{
     NA_BOMB_WAGON_N = 6,
     NA_BOMB_WAGON_E = 7,
 
-    NA_DESTROYED_ROOST_S = 8, 
-    NA_DESTROYED_ROOST_W = 9, 
+    NA_DESTROYED_ROOST_S = 8,
+    NA_DESTROYED_ROOST_W = 9,
     NA_DESTROYED_ROOST_N = 10,
     NA_DESTROYED_ROOST_E = 11,
 
@@ -246,7 +246,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
     bool HandleCustomSpell(Player *plr, uint32 spellId, GameObject * go);
     int32 HandleOpenGo(Player *plr, uint64 guid);

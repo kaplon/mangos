@@ -186,7 +186,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
 protected:
     bool HandleCapturePointEvent(Player * plr, uint32 eventId);
@@ -204,7 +204,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
 protected:
     bool HandleCapturePointEvent(Player * plr, uint32 eventId);
@@ -222,7 +222,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
 protected:
     bool HandleCapturePointEvent(Player * plr, uint32 eventId);
@@ -240,7 +240,7 @@ public:
     bool Update(uint32 diff);
     void FillInitialWorldStates(WorldPacket & data);
     // used when player is activated/inactivated in the area
-    bool HandlePlayerEnter(Player * plr);
+    void HandlePlayerEnter(Player * plr);
     void HandlePlayerLeave(Player * plr);
     bool HandleGossipOption(Player *plr, uint64 guid, uint32 gossipid);
 protected:

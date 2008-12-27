@@ -309,17 +309,13 @@ void OutdoorPvPObjectiveHP::FillInitialWorldStates(WorldPacket &data)
     }
 }
 
-bool OutdoorPvPObjectiveHP::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveHP::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(HP_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveHP::HandlePlayerLeave(Player *plr)

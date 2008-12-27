@@ -151,17 +151,13 @@ void OutdoorPvPObjectiveEP_EWT::UpdateTowerState()
     m_PvP->SendUpdateWorldState(EP_EWT_N , bool(m_TowerState & EP_TS_N));
 }
 
-bool OutdoorPvPObjectiveEP_EWT::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveEP_EWT::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveEP_EWT::HandlePlayerLeave(Player *plr)
@@ -325,17 +321,13 @@ void OutdoorPvPObjectiveEP_NPT::UpdateTowerState()
     m_PvP->SendUpdateWorldState(EP_NPT_N , bool(m_TowerState & EP_TS_N));
 }
 
-bool OutdoorPvPObjectiveEP_NPT::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveEP_NPT::HandlePlayerEnter(Player *plr) //TODO: look how this can be rewritten as template with other HandlePlayerEnter function
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveEP_NPT::HandlePlayerLeave(Player *plr)
@@ -494,17 +486,13 @@ void OutdoorPvPObjectiveEP_CGT::UpdateTowerState()
     m_PvP->SendUpdateWorldState(EP_CGT_N , bool(m_TowerState & EP_TS_N));
 }
 
-bool OutdoorPvPObjectiveEP_CGT::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveEP_CGT::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveEP_CGT::HandlePlayerLeave(Player *plr)
@@ -664,17 +652,13 @@ void OutdoorPvPObjectiveEP_PWT::UpdateTowerState()
     m_PvP->SendUpdateWorldState(EP_PWT_N , bool(m_TowerState & EP_TS_N));
 }
 
-bool OutdoorPvPObjectiveEP_PWT::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveEP_PWT::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(EP_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveEP_PWT::HandlePlayerLeave(Player *plr)

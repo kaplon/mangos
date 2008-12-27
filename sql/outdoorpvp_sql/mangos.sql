@@ -10,7 +10,7 @@ DELETE FROM creature WHERE id IN (18816,18821,21474,21484,21483,18192,18817,1882
 -- creature template changes
 -- guards don't regen health
 UPDATE creature_template SET RegenHealth = 0 WHERE entry IN (18192,18256);
--- 
+--
 UPDATE creature_template SET faction_A = 1630, faction_H = 1630, ScriptName = 'mob_eventai' WHERE entry = 18225;
 
 -- pvp flag
@@ -31,7 +31,7 @@ DELETE from gameobject WHERE id = 181682; -- DELETE the go that is spawned by th
 DELETE from creature WHERE id = 17209; -- DELETE the flight master that is spawned by the opvp
 
 UPDATE creature_template SET faction_a = 83, faction_h = 83 WHERE entry = 17995; -- horde guards faction
-UPDATE creature_template SET faction_a = 83, faction_h = 83 WHERE entry = 17996; 
+UPDATE creature_template SET faction_a = 83, faction_h = 83 WHERE entry = 17996;
 UPDATE creature_template SET faction_a = 84, faction_h = 84 WHERE entry = 17635; -- ally guards faction
 UPDATE creature_template SET faction_a = 84, faction_h = 84 WHERE entry = 17647;
 UPDATE creature_template SET faction_a = 84, faction_h = 83 WHERE entry = 17209; -- flight master

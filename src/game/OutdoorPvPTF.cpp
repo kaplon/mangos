@@ -99,17 +99,13 @@ void OutdoorPvPObjectiveTF::UpdateTowerState()
     m_PvP->SendUpdateWorldState(uint32(TFTowerWorldStates[m_TowerType].a),uint32(bool(m_TowerState & TF_TOWERSTATE_A)));
 }
 
-bool OutdoorPvPObjectiveTF::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveTF::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_DISPLAY, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_POS, phase);
-        plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_N, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_DISPLAY, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_POS, phase);
+    plr->SendUpdateWorldState(TF_UI_TOWER_SLIDER_N, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveTF::HandlePlayerLeave(Player *plr)
@@ -269,7 +265,7 @@ bool OutdoorPvPTF::SetupOutdoorPvP()
 
     m_IsLocked = false;
     m_LockTimer = TF_LOCK_TIME;
-    m_LockTimerUpdate = 0; 
+    m_LockTimerUpdate = 0;
     hours_left = 6;
     second_digit = 0;
     first_digit = 0;

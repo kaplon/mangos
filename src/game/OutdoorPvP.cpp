@@ -26,16 +26,16 @@
 #include "Group.h"
 #include "WorldPacket.h"
 
-OutdoorPvPObjective::OutdoorPvPObjective(OutdoorPvP * pvp) 
+OutdoorPvPObjective::OutdoorPvPObjective(OutdoorPvP * pvp)
 : m_PvP(pvp), m_AllianceActivePlayerCount(0), m_HordeActivePlayerCount(0),
 m_ShiftTimer(0), m_ShiftPhase(0), m_ShiftMaxPhase(0), m_OldPhase(0),
 m_State(0), m_OldState(0), m_CapturePoint(0), m_NeutralValue(0), m_ShiftMaxCaptureSpeed(0), m_CapturePointCreature(0)
 {
 }
 
-bool OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
+void OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
 {
-    // only called if really entered, so no use in the return value anymore
+    // only called if really entered
     // player distance and activity state was checked already in the AI
     std::set<uint64>::iterator pitr = m_ActivePlayerGuids.find(plr->GetGUID());
     // if not already counted as active, add player
@@ -47,9 +47,7 @@ bool OutdoorPvPObjective::HandlePlayerEnter(Player * plr)
             ++m_HordeActivePlayerCount;
         m_ActivePlayerGuids.insert(plr->GetGUID());
         sLog.outDebug("player %u entered an outdoorpvpobjective", plr->GetGUIDLow());
-        return true;
     }
-    return true;
 }
 
 void OutdoorPvPObjective::HandlePlayerLeave(Player * plr)
@@ -733,7 +731,7 @@ int32 OutdoorPvPObjective::HandleOpenGo(Player *plr, uint64 guid)
     std::map<uint64,uint32>::iterator itr = m_ObjectTypes.find(guid);
     if(itr != m_ObjectTypes.end())
     {
-        return itr->second;   
+        return itr->second;
     }
     return -1;
 }
