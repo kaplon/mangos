@@ -29,4 +29,6 @@ public:
     ~OutdoorPvPLA();
     bool SetupOutdoorPvP();
 
+};
+
 #endif
