@@ -52,17 +52,13 @@ void OutdoorPvPObjectiveZM_Beacon::UpdateTowerState()
     m_PvP->SendUpdateWorldState(uint32(ZMBeaconInfo[m_TowerType].map_tower_h),uint32(bool(m_TowerState & ZM_TOWERSTATE_H)));
 }
 
-bool OutdoorPvPObjectiveZM_Beacon::HandlePlayerEnter(Player *plr)
+void OutdoorPvPObjectiveZM_Beacon::HandlePlayerEnter(Player *plr)
 {
-    if(OutdoorPvPObjective::HandlePlayerEnter(plr))
-    {
-        plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_disp, 1);
-        uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
-        plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_pos, phase);
-        plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_n, m_NeutralValue);
-        return true;
-    }
-    return false;
+    OutdoorPvPObjective::HandlePlayerEnter(plr);
+    plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_disp, 1);
+    uint32 phase = (uint32)ceil(( m_ShiftPhase + m_ShiftMaxPhase) / ( 2 * m_ShiftMaxPhase ) * 100.0f);
+    plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_pos, phase);
+    plr->SendUpdateWorldState(ZMBeaconInfo[m_TowerType].slider_n, m_NeutralValue);
 }
 
 void OutdoorPvPObjectiveZM_Beacon::HandlePlayerLeave(Player *plr)
