@@ -54,7 +54,6 @@ void OutdoorPvPMgr::CreateOutdoorPvP(uint32 typeId)
         case OUTDOOR_PVP_ZM: pOP = new OutdoorPvPZM; break;
         case OUTDOOR_PVP_SI: pOP = new OutdoorPvPSI; break;
         case OUTDOOR_PVP_EP: pOP = new OutdoorPvPEP; break;
-        case OUTDOOR_PVP_LA: pOP = new OutdoorPvPLA; break;
         default: break;
     }
     if(!pOP)
@@ -74,6 +73,7 @@ void OutdoorPvPMgr::CreateOutdoorPvP(uint32 typeId)
 
 }
 
+<<<<<<< Updated upstream:src/game/OutdoorPvPMgr.cpp
 void OutdoorPvPMgr::InitOutdoorPvP()
 {
     CreateOutdoorPvP(OUTDOOR_PVP_HP);
@@ -82,7 +82,33 @@ void OutdoorPvPMgr::InitOutdoorPvP()
     CreateOutdoorPvP(OUTDOOR_PVP_ZM);
     CreateOutdoorPvP(OUTDOOR_PVP_SI);
     CreateOutdoorPvP(OUTDOOR_PVP_EP);
-    CreateOutdoorPvP(OUTDOOR_PVP_LA);
+=======
+    pOP = new OutdoorPvPEP;
+    // respawn, init variables
+    if(!pOP->SetupOutdoorPvP())
+    {
+        sLog.outDebug("OutdoorPvP : EP init failed.");
+        delete pOP;
+    }
+    else
+    {
+        m_OutdoorPvPSet.insert(pOP);
+        sLog.outDebug("OutdoorPvP : EP successfully initiated.");
+    }
+
+    pOP = new OutdoorPvPLA;
+    // respawn, init variables
+    if(!pOP->SetupOutdoorPvP())
+    {
+        sLog.outDebug("OutdoorPvP : LA init failed.");
+        delete pOP;
+    }
+    else
+    {
+        m_OutdoorPvPSet.insert(pOP);
+        sLog.outDebug("OutdoorPvP : LA successfully initiated.");
+    }
+>>>>>>> Stashed changes:src/game/OutdoorPvPMgr.cpp
 }
 
 void OutdoorPvPMgr::AddZone(uint32 zoneid, OutdoorPvP *handle)

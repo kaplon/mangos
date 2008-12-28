@@ -44,7 +44,8 @@ enum OutdoorPvPTypes{
     OUTDOOR_PVP_TF = 3,
     OUTDOOR_PVP_ZM = 4,
     OUTDOOR_PVP_SI = 5,
-    OUTDOOR_PVP_EP = 6
+    OUTDOOR_PVP_EP = 6,
+    OUTDOOR_PVP_LA = 7
 };
 
 // struct for go spawning
@@ -212,6 +213,7 @@ public:
     virtual void AwardKillBonus(Player * plr) {}
 
     uint32 GetTypeId() {return m_TypeId;}
+    void SetTypeId(uint32 TypeID) { m_TypeId = TypeID; }
 
     virtual bool HandleDropFlag(Player * plr, uint32 spellId);
 

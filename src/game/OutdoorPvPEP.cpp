@@ -27,6 +27,14 @@
 #include "Language.h"
 #include "World.h"
 
+OutdoorPvPEP::OutdoorPvPEP()
+{
+    m_TypeId = OUTDOOR_PVP_EP;
+    memset(EP_Controls,0,sizeof(EP_Controls));
+    m_AllianceTowersControlled = 0;
+    m_HordeTowersControlled = 0;
+}
+
 OutdoorPvPObjectiveEP_EWT::OutdoorPvPObjectiveEP_EWT(OutdoorPvP *pvp)
 : OutdoorPvPObjective(pvp), m_TowerState(EP_TS_N)
 {
@@ -725,15 +733,6 @@ bool OutdoorPvPObjectiveEP_PWT::HandleGossipOption(Player *plr, uint64 guid, uin
         return true;
     }
     return false;
-}
-
-// ep
-OutdoorPvPEP::OutdoorPvPEP()
-{
-    m_TypeId = OUTDOOR_PVP_EP;
-    memset(EP_Controls,0,sizeof(EP_Controls));
-    m_AllianceTowersControlled = 0;
-    m_HordeTowersControlled = 0;
 }
 
 bool OutdoorPvPEP::SetupOutdoorPvP()

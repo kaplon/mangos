@@ -23,3 +23,16 @@
 #include "WorldPacket.h"
 #include "Language.h"
 #include "World.h"
+
+OutdoorPvPLA::OutdoorPvPLA()
+{
+}
+
+OutdoorPvPLA::~OutdoorPvPLA()
+{
+}
+
+bool OutdoorPvPLA::SetupOutdoorPvP()
+{
+    return true;
+}

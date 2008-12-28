@@ -36,6 +36,7 @@ public:
     // dtor
     ~OutdoorPvPMgr();
 
+    void CreateOutdoorPvP(uint32 typeId);
     // create outdoor pvp events
     void InitOutdoorPvP();
     // called when a player enters an outdoor pvp area

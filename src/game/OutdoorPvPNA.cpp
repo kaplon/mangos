@@ -26,7 +26,6 @@
 
 OutdoorPvPNA::OutdoorPvPNA()
 {
-    m_TypeId = OUTDOOR_PVP_NA;
 }
 
 void OutdoorPvPNA::HandleKillImpl(Player *plr, Unit * killed)

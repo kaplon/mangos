@@ -26,6 +26,14 @@
 #include "GossipDef.h"
 #include "World.h"
 
+OutdoorPvPZM::OutdoorPvPZM()
+{
+    m_GraveYard = NULL;
+    m_AllianceTowersControlled = 0;
+    m_HordeTowersControlled = 0;
+
+}
+
 OutdoorPvPObjectiveZM_Beacon::OutdoorPvPObjectiveZM_Beacon(OutdoorPvP *pvp, ZM_BeaconType type)
 : OutdoorPvPObjective(pvp), m_TowerType(type), m_TowerState(ZM_TOWERSTATE_N)
 {
@@ -181,15 +189,6 @@ void OutdoorPvPZM::HandlePlayerLeaveZone(Player * plr, uint32 zone)
     plr->RemoveAurasDueToSpell(ZM_BATTLE_STANDARD_A);
     plr->RemoveAurasDueToSpell(ZM_BATTLE_STANDARD_H);
     OutdoorPvP::HandlePlayerLeaveZone(plr, zone);
-}
-
-OutdoorPvPZM::OutdoorPvPZM()
-{
-    m_TypeId = OUTDOOR_PVP_ZM;
-    m_GraveYard = NULL;
-    m_AllianceTowersControlled = 0;
-    m_HordeTowersControlled = 0;
-
 }
 
 bool OutdoorPvPZM::SetupOutdoorPvP()

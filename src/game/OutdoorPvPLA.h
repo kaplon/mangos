@@ -22,4 +22,11 @@
 #include "OutdoorPvP.h"
 
 
+class OutdoorPvPLA : public OutdoorPvP
+{
+public:
+    OutdoorPvPLA();
+    ~OutdoorPvPLA();
+    bool SetupOutdoorPvP();
+
 #endif

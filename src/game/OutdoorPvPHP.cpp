@@ -25,6 +25,10 @@
 #include "ObjectMgr.h"
 #include "Language.h"
 
+OutdoorPvPHP::OutdoorPvPHP()
+{
+}
+
 const uint32 HP_LANG_LOOSE_A[HP_TOWER_NUM] = {LANG_OPVP_HP_LOOSE_BROKENHILL_A,LANG_OPVP_HP_LOOSE_OVERLOOK_A,LANG_OPVP_HP_LOOSE_STADIUM_A};
 
 const uint32 HP_LANG_LOOSE_H[HP_TOWER_NUM] = {LANG_OPVP_HP_LOOSE_BROKENHILL_H,LANG_OPVP_HP_LOOSE_OVERLOOK_H,LANG_OPVP_HP_LOOSE_STADIUM_H};
@@ -57,11 +61,6 @@ OutdoorPvPObjectiveHP::OutdoorPvPObjectiveHP(OutdoorPvP *pvp,OutdoorPvPHPTowerTy
         HPTowerFlags[type].rot1,
         HPTowerFlags[type].rot2,
         HPTowerFlags[type].rot3);
-}
-
-OutdoorPvPHP::OutdoorPvPHP()
-{
-    m_TypeId = OUTDOOR_PVP_HP;
 }
 
 bool OutdoorPvPHP::SetupOutdoorPvP()
