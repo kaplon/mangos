@@ -273,7 +273,8 @@ enum SpellSpecific
     SPELL_JUDGEMENT         = 13,
     SPELL_BATTLE_ELIXIR     = 14,
     SPELL_GUARDIAN_ELIXIR   = 15,
-    SPELL_FLASK_ELIXIR      = 16
+    SPELL_FLASK_ELIXIR      = 16,
+    SPELL_PRESENCE          = 17
 };
 
 SpellSpecific GetSpellSpecific(uint32 spellId);
@@ -301,7 +302,7 @@ inline bool IsSealSpell(SpellEntry const *spellInfo)
 {
     //Collection of all the seal family flags. No other paladin spell has any of those.
     return spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN &&
-        ( spellInfo->SpellFamilyFlags & 0x4000A000200LL );
+        ( spellInfo->SpellFamilyFlags & 0x26000C000A000000LL );
 }
 
 inline bool IsElementalShield(SpellEntry const *spellInfo)
