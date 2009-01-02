@@ -69,20 +69,6 @@ static bool isNonTriggerAura[TOTAL_AURAS];
 // Prepare lists
 static bool procPrepared = InitTriggerAuraData();
 
-bool IsPassiveStackableSpell( uint32 spellId )
-{
-    if(!IsPassiveSpell(spellId))
-        return false;
-
-    SpellEntry const* spellProto = sSpellStore.LookupEntry(spellId);
-    if(!spellProto)
-        return false;
-    if (spellProto->procFlags)
-        return false;
-
-    return true;
-}
-
 Unit::Unit()
 : WorldObject(), i_motionMaster(this), m_ThreatManager(this), m_HostilRefManager(this)
 {
@@ -560,10 +546,8 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
         // call kill spell proc event (before real die and combat stop to triggering auras removed at death/combat stop)
         if(player && player!=pVictim)
         {
-            if(player->RewardPlayerAndGroupAtKill(pVictim))
-                player->ProcDamageAndSpell(pVictim, PROC_FLAG_KILL_AND_GET_XP, PROC_FLAG_KILLED, PROC_EX_NONE, 0);
-            else
-                player->ProcDamageAndSpell(pVictim, PROC_FLAG_NONE, PROC_FLAG_KILLED,PROC_EX_NONE, 0);
+            player->RewardPlayerAndGroupAtKill(pVictim);
+            player->ProcDamageAndSpell(pVictim, PROC_FLAG_KILL, PROC_FLAG_KILLED, PROC_EX_NONE, 0);
         }
 
         DEBUG_LOG("DealDamageAttackStop");
@@ -1925,10 +1909,10 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit *pVictim, WeaponAttackT
     // Useful if want to specify crit & miss chances for melee, else it could be removed
     DEBUG_LOG("MELEE OUTCOME: miss %f crit %f dodge %f parry %f block %f", miss_chance,crit_chance,dodge_chance,parry_chance,block_chance);
 
-    return RollMeleeOutcomeAgainst(pVictim, attType, int32(crit_chance*100), int32(miss_chance*100), int32(dodge_chance*100),int32(parry_chance*100),int32(block_chance*100), false);
+    return RollMeleeOutcomeAgainst(pVictim, attType, int32(crit_chance*100), int32(miss_chance*100), int32(dodge_chance*100),int32(parry_chance*100),int32(block_chance*100));
 }
 
-MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttackType attType, int32 crit_chance, int32 miss_chance, int32 dodge_chance, int32 parry_chance, int32 block_chance, bool SpellCasted ) const
+MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttackType attType, int32 crit_chance, int32 miss_chance, int32 dodge_chance, int32 parry_chance, int32 block_chance) const
 {
     if(pVictim->GetTypeId()==TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
         return MELEE_HIT_EVADE;
@@ -1941,7 +1925,6 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttack
 
     // bonus from skills is 0.04%
     int32    skillBonus  = 4 * ( attackerWeaponSkill - victimMaxSkillValueForLevel );
-    int32    skillBonus2 = 4 * ( attackerMaxSkillValueForLevel - victimDefenseSkill );
     int32    sum = 0, tmp = 0;
     int32    roll = urand (0, 10000);
 
@@ -2022,16 +2005,6 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttack
                 && ((tmp -= skillBonus) > 0)
                 && (roll < (sum += tmp)))
             {
-                // Critical chance
-                tmp = crit_chance + skillBonus2;
-                if ( GetTypeId() == TYPEID_PLAYER && SpellCasted && tmp > 0 )
-                {
-                    if ( roll_chance_i(tmp/100))
-                    {
-                        DEBUG_LOG ("RollMeleeOutcomeAgainst: BLOCKED CRIT");
-                        return MELEE_HIT_BLOCK_CRIT;
-                    }
-                }
                 DEBUG_LOG ("RollMeleeOutcomeAgainst: BLOCK <%d, %d)", sum-tmp, sum);
                 return MELEE_HIT_BLOCK;
             }
@@ -2039,7 +2012,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttack
     }
 
     // Critical chance
-    tmp = crit_chance + skillBonus2;
+    tmp = crit_chance;
 
     if (tmp > 0 && roll < (sum += tmp))
     {
@@ -2048,7 +2021,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttack
     }
 
     // Max 40% chance to score a glancing blow against mobs that are higher level (can do only players and pets and not with ranged weapon)
-    if( attType != RANGED_ATTACK && !SpellCasted &&
+    if( attType != RANGED_ATTACK &&
         (GetTypeId() == TYPEID_PLAYER || ((Creature*)this)->isPet()) &&
         pVictim->GetTypeId() != TYPEID_PLAYER && !((Creature*)pVictim)->isPet() &&
         getLevel() < pVictim->getLevelForTarget(this) )
@@ -2067,10 +2040,14 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst (const Unit *pVictim, WeaponAttack
         }
     }
 
-    if(GetTypeId()!=TYPEID_PLAYER && !(((Creature*)this)->GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_NO_CRUSH) && !((Creature*)this)->isPet() )
+    // mobs can score crushing blows if they're 4 or more levels above victim
+    if (getLevelForTarget(pVictim) >= pVictim->getLevelForTarget(this) + 4 &&
+        // can be from by creature (if can) or from controlled player that considered as creature
+        (GetTypeId()!=TYPEID_PLAYER && !((Creature*)this)->isPet() &&
+        !(((Creature*)this)->GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_NO_CRUSH) ||
+        GetTypeId()==TYPEID_PLAYER && GetCharmerOrOwnerGUID()))
     {
-        // mobs can score crushing blows if they're 3 or more levels above victim
-        // or when their weapon skill is 15 or more above victim's defense skill
+        // when their weapon skill is 15 or more above victim's defense skill
         tmp = victimDefenseSkill;
         int32 tmpmax = victimMaxSkillValueForLevel;
         // having defense above your maximum (from items, talents etc.) has no effect
@@ -2180,15 +2157,23 @@ bool Unit::isSpellBlocked(Unit *pVictim, SpellEntry const *spellProto, WeaponAtt
 {
     if (pVictim->HasInArc(M_PI,this))
     {
+        /* Currently not exist spells with ignore block
         // Ignore combat result aura (parry/dodge check on prepare)
         AuraList const& ignore = GetAurasByType(SPELL_AURA_IGNORE_COMBAT_RESULT);
         for(AuraList::const_iterator i = ignore.begin(); i != ignore.end(); ++i)
         {
             if (!(*i)->isAffectedOnSpell(spellProto))
                 continue;
-            if ((*i)->GetModifier()->m_miscvalue == MELEE_HIT_BLOCK)
+            if ((*i)->GetModifier()->m_miscvalue == )
                 return false;
         }
+        */
+
+        // Check creatures flags_extra for disable block
+        if(pVictim->GetTypeId()==TYPEID_UNIT &&
+           ((Creature*)pVictim)->GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_NO_BLOCK )
+                return false;
+
         float blockChance = GetUnitBlockChance();
         blockChance += (GetWeaponSkillValue(attackType) - pVictim->GetMaxSkillValueForLevel() )*0.04;
         if (roll_chance_f(blockChance))
@@ -2283,7 +2268,13 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit *pVictim, SpellEntry const *spell)
         // Can`t parry 
         canParry = false;
     }
-
+    // Check creatures flags_extra for disable parry
+    if(pVictim->GetTypeId()==TYPEID_UNIT)
+    {
+        uint32 flagEx = ((Creature*)pVictim)->GetCreatureInfo()->flags_extra;
+        if( flagEx & CREATURE_FLAG_EXTRA_NO_PARRY )
+            canParry = false;
+    }
     // Ignore combat result aura
     AuraList const& ignore = GetAurasByType(SPELL_AURA_IGNORE_COMBAT_RESULT);
     for(AuraList::const_iterator i = ignore.begin(); i != ignore.end(); ++i)
@@ -2677,6 +2668,9 @@ float Unit::GetUnitCriticalChance(WeaponAttackType attackType, const Unit *pVict
         else
             crit -= ((Player*)pVictim)->GetRatingBonusValue(CR_CRIT_TAKEN_MELEE);
     }
+
+    // Apply crit chance from defence skill
+    crit += (int32(GetMaxSkillValueForLevel(pVictim)) - int32(pVictim->GetDefenseSkillValue(this))) * 0.04f;
 
     if (crit < 0.0f)
         crit = 0.0f;
@@ -3267,9 +3261,8 @@ bool Unit::AddAura(Aura *Aur)
         }
     }
 
-    // passive auras stack with all (except passive spell proc auras)
-    if ((!Aur->IsPassive() || !IsPassiveStackableSpell(Aur->GetId())) &&
-        !(Aur->GetId() == 20584 || Aur->GetId() == 8326))
+    // passive auras not stacable with other ranks
+    if (!IsPassiveSpellStackableWithRanks(aurSpellInfo))
     {
         if (!RemoveNoStackAurasDueToAura(Aur))
         {
@@ -3364,6 +3357,14 @@ bool Unit::RemoveNoStackAurasDueToAura(Aura *Aur)
         return false;
 
     uint32 spellId = Aur->GetId();
+
+    // passive spell special case (only non stackable with ranks)
+    if(IsPassiveSpell(spellId))
+    {
+        if(IsPassiveSpellStackableWithRanks(spellProto))
+            return true;
+    }
+
     uint32 effIndex = Aur->GetEffIndex();
 
     SpellSpecific spellId_spec = GetSpellSpecific(spellId);
@@ -3382,9 +3383,11 @@ bool Unit::RemoveNoStackAurasDueToAura(Aura *Aur)
 
         uint32 i_spellId = i_spellProto->Id;
 
+        // early checks that spellId is passive non stackable spell
         if(IsPassiveSpell(i_spellId))
         {
-            if(IsPassiveStackableSpell(i_spellId))
+            // passive non-stackable spells not stackable only for same caster
+            if(Aur->GetCasterGUID()!=i->second->GetCasterGUID())
                 continue;
 
             // passive non-stackable spells not stackable only with another rank of same spell
@@ -6255,7 +6258,7 @@ bool Unit::IsHostileTo(Unit const* unit) const
             return false;
 
         // PvP FFA state
-        if(pTester->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP) && pTarget->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP))
+        if(pTester->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP) && pTarget->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP))
             return true;
 
         //= PvP states
@@ -6364,7 +6367,7 @@ bool Unit::IsFriendlyTo(Unit const* unit) const
             return true;
 
         // PvP FFA state
-        if(pTester->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP) && pTarget->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP))
+        if(pTester->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP) && pTarget->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP))
             return false;
 
         //= PvP states
@@ -7275,7 +7278,6 @@ bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolM
             if (pVictim)
             {
                 crit_chance = GetUnitCriticalChance(attackType, pVictim);
-                crit_chance+= (int32(GetMaxSkillValueForLevel(pVictim)) - int32(pVictim->GetDefenseSkillValue(this))) * 0.04f;
                 crit_chance+= GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_SPELL_CRIT_CHANCE_SCHOOL, schoolMask);
             }
             break;
@@ -8776,8 +8778,11 @@ int32 Unit::CalculateSpellDamage(SpellEntry const* spellProto, uint8 effect_inde
     int32 randomPoints = int32(spellProto->EffectDieSides[effect_index] + level * randomPointsPerLevel);
     float comboDamage = spellProto->EffectPointsPerComboPoint[effect_index];
 
-    // prevent random generator from getting confused by spells casted with Unit::CastCustomSpell
-    int32 randvalue = spellProto->EffectBaseDice[effect_index] >= randomPoints ? spellProto->EffectBaseDice[effect_index]:irand(spellProto->EffectBaseDice[effect_index], randomPoints);
+    // range can have possitive and negative values, so order its for irand
+    int32 randvalue = int32(spellProto->EffectBaseDice[effect_index]) >= randomPoints
+        ? irand(randomPoints, int32(spellProto->EffectBaseDice[effect_index]))
+        : irand(int32(spellProto->EffectBaseDice[effect_index]), randomPoints);
+
     int32 value = basePoints + randvalue;
     //random damage
     if(comboDamage != 0 && unitPlayer && target && (target->GetGUID() == unitPlayer->GetComboTarget()))
@@ -9597,6 +9602,7 @@ bool InitTriggerAuraData()
       isTriggerAura[i]=false;
       isNonTriggerAura[i] = false;
     }
+    isTriggerAura[SPELL_AURA_PERIODIC_DAMAGE] = true;
     isTriggerAura[SPELL_AURA_DUMMY] = true;
     isTriggerAura[SPELL_AURA_MOD_CONFUSE] = true;
     isTriggerAura[SPELL_AURA_MOD_THREAT] = true;
@@ -9670,18 +9676,8 @@ uint32 createProcExtendMask(SpellNonMeleeDamage *damageInfo, SpellMissInfo missC
     return procEx;
 }
 
-static int deep = 0;
 void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag, uint32 procExtra, WeaponAttackType attType, SpellEntry const * procSpell, uint32 damage )
 {
-    deep ++;
-    if (deep > 5)
-    {
-        sLog.outError("Prevent possible stack owerflow in Unit::ProcDamageAndSpellFor");
-        if (procSpell)
-            sLog.outError("  Spell %u", procSpell->Id);
-        deep--;
-        return;
-    }
     // For melee/ranged based attack need update skills and set some Aura states
     if (procFlag & MELEE_BASED_TRIGGER_MASK)
     {
@@ -9765,7 +9761,7 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
     for(AuraMap::const_iterator itr = GetAuras().begin(); itr!= GetAuras().end(); ++itr)
     {
         SpellProcEventEntry const* spellProcEvent = NULL;
-        if(!IsTriggeredAtSpellProcEvent(itr->second, procSpell, procFlag, procExtra, attType, isVictim, (damage > 0), spellProcEvent))
+        if(!IsTriggeredAtSpellProcEvent(pTarget, itr->second, procSpell, procFlag, procExtra, attType, isVictim, (damage > 0), spellProcEvent))
            continue;
 
         procTriggered.push_back( ProcTriggeredData(spellProcEvent, itr->second) );
@@ -9943,7 +9939,6 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
         for(RemoveSpellList::const_iterator i = removedSpells.begin(); i != removedSpells.end();i++)
             RemoveAurasDueToSpell(*i);
     }
-    deep--;
 }
 
 SpellSchoolMask Unit::GetMeleeDamageSchoolMask() const
@@ -10310,6 +10305,16 @@ Unit* Unit::SelectNearbyTarget() const
     return *tcIter;
 }
 
+bool Unit::hasNegativeAuraWithInterruptFlag(uint32 flag)
+{
+    for (AuraMap::iterator iter = m_Auras.begin(); iter != m_Auras.end(); ++iter)
+    {
+        if (!iter->second->IsPositive() && iter->second->GetSpellProto()->AuraInterruptFlags & flag)
+            return true;
+    }
+    return false;
+}
+
 void Unit::ApplyAttackTimePercentMod( WeaponAttackType att,float val, bool apply )
 {
     if(val > 0)
@@ -10562,7 +10567,7 @@ Pet* Unit::CreateTamedPetFrom(Creature* creatureTarget,uint32 spell_id)
     return pet;
 }
 
-bool Unit::IsTriggeredAtSpellProcEvent(Aura* aura, SpellEntry const* procSpell, uint32 procFlag, uint32 procExtra, WeaponAttackType attType, bool isVictim, bool active, SpellProcEventEntry const*& spellProcEvent )
+bool Unit::IsTriggeredAtSpellProcEvent(Unit *pVictim, Aura* aura, SpellEntry const* procSpell, uint32 procFlag, uint32 procExtra, WeaponAttackType attType, bool isVictim, bool active, SpellProcEventEntry const*& spellProcEvent )
 {
     SpellEntry const* spellProto = aura->GetSpellProto ();
 
@@ -10592,7 +10597,17 @@ bool Unit::IsTriggeredAtSpellProcEvent(Aura* aura, SpellEntry const* procSpell, 
     if(!SpellMgr::IsSpellProcEventCanTriggeredBy(spellProcEvent, EventProcFlag, procSpell, procFlag, procExtra, active))
         return false;
 
-    // Aura added by spell can`t trogger from self (prevent drop cahres/do triggers)
+    // In most cases req get honor or XP from kill
+    if (EventProcFlag & PROC_FLAG_KILL && GetTypeId() == TYPEID_PLAYER)
+    {
+        bool allow = ((Player*)this)->isHonorOrXPTarget(pVictim);
+        // Shadow Word: Death - can trigger from every kill
+        if (aura->GetId() == 32409)
+            allow = true;
+        if (!allow)
+            return false;
+    }
+    // Aura added by spell can`t trogger from self (prevent drop charges/do triggers)
     // But except periodic triggers (can triggered from self)
     if(procSpell && procSpell->Id == spellProto->Id && !(spellProto->procFlags&PROC_FLAG_ON_TAKE_PERIODIC))
         return false;

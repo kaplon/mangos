@@ -325,6 +325,12 @@ struct AchievementCriteriaEntry
             uint32  rollValue;                              // 3
             uint32  count;                                  // 4
         } roll_need_on_loot;
+       // ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED_ON_LOOT= 51
+        struct
+        {
+            uint32  rollValue;                              // 3
+            uint32  count;                                  // 4
+        } roll_greed_on_loot;
 
         // ACHIEVEMENT_CRITERIA_TYPE_HK_CLASS = 52
         struct
@@ -483,6 +489,12 @@ struct AreaTableEntry
     char*   area_name[16];                                  // 11-26
                                                             // 27, string flags, unused
     uint32  team;                                           // 28
+};
+
+struct AreaGroupEntry
+{
+    uint32  AreaGroupId;                                    // 0
+    uint32  AreaId[7];                                      // 1-7
 };
 
 struct AreaTriggerEntry
@@ -1152,7 +1164,7 @@ struct SpellEntry
     //uint32    MinReputation;                              // 223      m_minReputation not used
     //uint32    RequiredAuraVision;                         // 224      m_requiredAuraVision not used
     uint32    TotemCategory[2];                             // 225-226  m_requiredTotemCategoryID
-    int32     AreaId;                                       // 227      m_requiredAreasID
+    int32     AreaGroupId;                                  // 227      m_requiredAreaGroupId
     uint32    SchoolMask;                                   // 228      m_schoolMask
     uint32    runeCostID;                                   // 229      m_runeCostID
     //uint32    spellMissileID;                             // 230      m_spellMissileID not used

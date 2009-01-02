@@ -315,6 +315,15 @@ int32 CompareAuraRanks(uint32 spellId_1, uint32 effIndex_1, uint32 spellId_2, ui
 bool IsSingleFromSpellSpecificPerCaster(uint32 spellSpec1,uint32 spellSpec2);
 bool IsPassiveSpell(uint32 spellId);
 
+inline bool IsPassiveSpellStackableWithRanks(SpellEntry const* spellProto)
+{
+    if(!IsPassiveSpell(spellProto->Id))
+        return false;
+
+    return !IsSpellHaveEffect(spellProto,SPELL_EFFECT_APPLY_AURA);
+}
+
+
 inline bool IsDeathPersistentSpell(SpellEntry const *spellInfo)
 {
     switch(spellInfo->Id)
@@ -342,7 +351,7 @@ bool IsSingleTargetSpells(SpellEntry const *spellInfo1, SpellEntry const *spellI
 
 bool IsAuraAddedBySpell(uint32 auraType, uint32 spellId);
 
-bool IsSpellAllowedInLocation(SpellEntry const *spellInfo,uint32 map_id,uint32 zone_id,uint32 area_id);
+uint8 GetSpellAllowedInLocationError(SpellEntry const *spellInfo,uint32 map_id,uint32 zone_id,uint32 area_id);
 
 inline bool IsAreaEffectTarget( Targets target )
 {
@@ -353,15 +362,16 @@ inline bool IsAreaEffectTarget( Targets target )
         case TARGET_ALL_ENEMY_IN_AREA_INSTANT:
         case TARGET_ALL_PARTY_AROUND_CASTER:
         case TARGET_ALL_AROUND_CASTER:
+        case TARGET_IN_FRONT_OF_CASTER:
         case TARGET_ALL_ENEMY_IN_AREA_CHANNELED:
         case TARGET_ALL_FRIENDLY_UNITS_AROUND_CASTER:
+        case TARGET_ALL_FRIENDLY_UNITS_IN_AREA:
         case TARGET_ALL_PARTY:
         case TARGET_ALL_PARTY_AROUND_CASTER_2:
         case TARGET_AREAEFFECT_PARTY:
         case TARGET_AREAEFFECT_CUSTOM_2:
+        case TARGET_ALL_RAID_AROUND_CASTER:
         case TARGET_AREAEFFECT_PARTY_AND_CLASS:
-        case TARGET_IN_FRONT_OF_CASTER:
-        case TARGET_ALL_FRIENDLY_UNITS_IN_AREA:
             return true;
         default:
             break;
@@ -404,6 +414,12 @@ inline bool isSpellBreakStealth(SpellEntry const* spellInfo)
 {
     return !(spellInfo->AttributesEx & SPELL_ATTR_EX_NOT_BREAK_STEALTH);
 }
+
+inline bool IsAutoRepeatRangedSpell(SpellEntry const* spellInfo)
+{
+    return (spellInfo->Attributes & SPELL_ATTR_RANGED) && (spellInfo->AttributesEx2 == 0x000020 /*autorepeat*/);
+}
+
 
 uint8 GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form);
 
@@ -468,7 +484,7 @@ enum ProcFlags
    PROC_FLAG_NONE                          = 0x00000000,
 
    PROC_FLAG_KILLED                        = 0x00000001,    // 00 Killed by agressor
-   PROC_FLAG_KILL_AND_GET_XP               = 0x00000002,    // 01 Kill that yields experience or honor
+   PROC_FLAG_KILL                          = 0x00000002,    // 01 Kill target (in most cases need XP/Honor reward)
 
    PROC_FLAG_SUCCESSFUL_MILEE_HIT          = 0x00000004,    // 02 Successful melee auto attack
    PROC_FLAG_TAKEN_MELEE_HIT               = 0x00000008,    // 03 Taken damage from melee auto attack hit

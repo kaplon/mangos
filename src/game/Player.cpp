@@ -1370,7 +1370,7 @@ void Player::BuildEnumData( QueryResult * result, WorldPacket * p_data )
 
     *p_data << uint8(getLevel());                           // player level
     // do not use GetMap! it will spawn a new instance since the bound instances are not loaded
-    uint32 zoneId = MapManager::Instance().GetZoneId(GetMapId(), GetPositionX(),GetPositionY());
+    uint32 zoneId = MapManager::Instance().GetZoneId(GetMapId(), GetPositionX(),GetPositionY(),GetPositionZ());
     sLog.outDebug("Player::BuildEnumData: m:%u, x:%f, y:%f, z:%f zone:%u", GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), zoneId);
     *p_data << uint32(zoneId);
     *p_data << uint32(GetMapId());
@@ -1985,7 +1985,7 @@ void Player::SetGameMaster(bool on)
         setFaction(35);
         SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM);
 
-        RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP);
+        RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
         ResetContestedPvP();
 
         getHostilRefManager().setOnlineOfflineState(false);
@@ -1999,7 +1999,7 @@ void Player::SetGameMaster(bool on)
 
         // restore FFA PvP Server state
         if(sWorld.IsFFAPvPRealm())
-            SetFlag(PLAYER_FLAGS,PLAYER_FLAGS_FFA_PVP);
+            SetByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
 
         // restore FFA PvP area state, remove not allowed for GM mounts
         UpdateArea(m_areaUpdateId);
@@ -2374,9 +2374,10 @@ void Player::InitStatsForLevel(bool reapplyMods)
     SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE );   // must be set
 
     // cleanup player flags (will be re-applied if need at aura load), to avoid have ghost flag without ghost aura, for example.
-    RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_AFK | PLAYER_FLAGS_DND | PLAYER_FLAGS_GM | PLAYER_FLAGS_GHOST | PLAYER_FLAGS_FFA_PVP);
+    RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_AFK | PLAYER_FLAGS_DND | PLAYER_FLAGS_GM | PLAYER_FLAGS_GHOST);
 
     SetByteValue(UNIT_FIELD_BYTES_1, 2, 0x00);              // one form stealth modified bytes
+    RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP | UNIT_BYTE2_FLAG_SANCTUARY);
 
     // restore if need some important flags
     SetUInt32Value(PLAYER_FIELD_BYTES2, 0 );                // flags empty by default
@@ -3010,6 +3011,8 @@ void Player::removeSpell(uint32 spell_id, bool disabled)
 
     for(SpellLearnSpellMap::const_iterator itr2 = spell_begin; itr2 != spell_end; ++itr2)
         removeSpell(itr2->second.spell, disabled);
+
+    // TODO: recast if need lesser ranks spell for passive with IsPassiveSpellStackableWithRanks
 }
 
 void Player::RemoveArenaSpellCooldowns()
@@ -5327,7 +5330,7 @@ void Player::CheckExploreSystem()
     if (isInFlight())
         return;
 
-    uint16 areaFlag=MapManager::Instance().GetBaseMap(GetMapId())->GetAreaFlag(GetPositionX(),GetPositionY());
+    uint16 areaFlag=MapManager::Instance().GetBaseMap(GetMapId())->GetAreaFlag(GetPositionX(),GetPositionY(),GetPositionZ());
     if(areaFlag==0xffff)
         return;
     int offset = areaFlag / 32;
@@ -6169,16 +6172,17 @@ uint32 Player::GetZoneIdFromDB(uint64 guid)
     if (!zone)
     {
         // stored zone is zero, use generic and slow zone detection
-        result = CharacterDatabase.PQuery("SELECT map,position_x,position_y FROM characters WHERE guid='%u'", guidLow);
+        result = CharacterDatabase.PQuery("SELECT map,position_x,position_y,position_z FROM characters WHERE guid='%u'", guidLow);
         if( !result )
             return 0;
         fields = result->Fetch();
         uint32 map = fields[0].GetUInt32();
         float posx = fields[1].GetFloat();
         float posy = fields[2].GetFloat();
+        float posz = fields[3].GetFloat();
         delete result;
 
-        zone = MapManager::Instance().GetZoneId(map,posx,posy);
+        zone = MapManager::Instance().GetZoneId(map,posx,posy,posz);
 
         CharacterDatabase.PExecute("UPDATE characters SET zone='%u' WHERE guid='%u'", zone, guidLow);
     }
@@ -6197,14 +6201,14 @@ void Player::UpdateArea(uint32 newArea)
     if(area && (area->flags & AREA_FLAG_ARENA))
     {
         if(!isGameMaster())
-            SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP);
+            SetByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
     }
     else
     {
         // remove ffa flag only if not ffapvp realm
         // removal in sanctuaries and capitals is handled in zone update
-        if(HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP) && !sWorld.IsFFAPvPRealm())
-            RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_FFA_PVP);
+        if(HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP) && !sWorld.IsFFAPvPRealm())
+            RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
     }
 
     UpdateAreaDependentAuras(newArea);
@@ -6268,7 +6272,7 @@ void Player::UpdateZone(uint32 newZone)
     {
         SetByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_SANCTUARY);
         if(sWorld.IsFFAPvPRealm())
-            RemoveFlag(PLAYER_FLAGS,PLAYER_FLAGS_FFA_PVP);
+            RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
     }
     else
     {
@@ -6282,7 +6286,7 @@ void Player::UpdateZone(uint32 newZone)
         InnEnter(time(0),GetMapId(),0,0,0);
 
         if(sWorld.IsFFAPvPRealm())
-            RemoveFlag(PLAYER_FLAGS,PLAYER_FLAGS_FFA_PVP);
+            RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
     }
     else                                                    // anywhere else
     {
@@ -6296,7 +6300,7 @@ void Player::UpdateZone(uint32 newZone)
                     SetRestType(REST_TYPE_NO);
 
                     if(sWorld.IsFFAPvPRealm())
-                        SetFlag(PLAYER_FLAGS,PLAYER_FLAGS_FFA_PVP);
+                        SetByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
                 }
             }
             else                                            // not in tavern (leave city then)
@@ -6306,7 +6310,7 @@ void Player::UpdateZone(uint32 newZone)
 
                 // Set player to FFA PVP when not in rested environment.
                 if(sWorld.IsFFAPvPRealm())
-                    SetFlag(PLAYER_FLAGS,PLAYER_FLAGS_FFA_PVP);
+                    SetByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
             }
         }
     }
@@ -18836,25 +18840,34 @@ void Player::UpdateAreaDependentAuras( uint32 newArea )
     for(AuraMap::iterator iter = m_Auras.begin(); iter != m_Auras.end();)
     {
         // use m_zoneUpdateId for speed: UpdateArea called from UpdateZone or instead UpdateZone in both cases m_zoneUpdateId up-to-date
-        if(!IsSpellAllowedInLocation(iter->second->GetSpellProto(),GetMapId(),m_zoneUpdateId,newArea))
+        if(GetSpellAllowedInLocationError(iter->second->GetSpellProto(),GetMapId(),m_zoneUpdateId,newArea)!=0)
             RemoveAura(iter);
         else
             ++iter;
     }
 
-    // unmount if enter in this subzone
-    if( newArea == 35)
-        RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
-    // Dragonmaw Illusion
-    else if( newArea == 3759 || newArea == 3966 || newArea == 3939 )
+    // some auras applied at subzone enter
+    switch(newArea)
     {
-        if( GetDummyAura(40214) )
-        {
-            if( !HasAura(40216,0) )
-                CastSpell(this,40216,true);
-            if( !HasAura(42016,0) )
-                CastSpell(this,42016,true);
-        }
+        // Dragonmaw Illusion
+        case 3759:                                          // Netherwing Ledge
+        case 3939:                                          // Dragonmaw Fortress
+        case 3966:                                          // Dragonmaw Base Camp
+            if( GetDummyAura(40214) )
+            {
+                if( !HasAura(40216,0) )
+                    CastSpell(this,40216,true);
+                if( !HasAura(42016,0) )
+                    CastSpell(this,42016,true);
+            }
+            break;
+        // Dominion Over Acherus
+        case 4281:                                          // Acherus: The Ebon Hold
+        case 4342:                                          // Acherus: The Ebon Hold
+            if( HasSpell(51721) )
+                if( !HasAura(51721,0) )
+                    CastSpell(this,51721,true);
+            break;
     }
 }
 
