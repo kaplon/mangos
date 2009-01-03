@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1082,10 +1082,10 @@ struct SpellEntry
     uint32    TargetAuraState;                              // 18       m_targetAuraState
     uint32    CasterAuraStateNot;                           // 19       m_excludeCasterAuraState
     uint32    TargetAuraStateNot;                           // 20       m_excludeTargetAuraState
-    //uint32    casterAuraSpell;                            // 21       m_casterAuraSpell not used
-    //uint32    targetAuraSpell;                            // 22       m_targetAuraSpell not used
-    //uint32    excludeCasterAuraSpell;                     // 23       m_excludeCasterAuraSpell not used
-    //uint32    excludeTargetAuraSpell;                     // 24       m_excludeTargetAuraSpell not used
+    uint32    casterAuraSpell;                              // 21       m_casterAuraSpell
+    uint32    targetAuraSpell;                              // 22       m_targetAuraSpell
+    uint32    excludeCasterAuraSpell;                       // 23       m_excludeCasterAuraSpell
+    uint32    excludeTargetAuraSpell;                       // 24       m_excludeTargetAuraSpell
     uint32    CastingTimeIndex;                             // 25       m_castingTimeIndex
     uint32    RecoveryTime;                                 // 26       m_recoveryTime
     uint32    CategoryRecoveryTime;                         // 27       m_categoryRecoveryTime
