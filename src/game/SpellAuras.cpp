@@ -417,15 +417,9 @@ m_periodicTimer(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISHING_NONE)
 
     m_isDeathPersist = IsDeathPersistentSpell(m_spellProto);
 
-    if(m_spellProto->procCharges)
-    {
-        m_procCharges = m_spellProto->procCharges;
-
-        if(modOwner)
-            modOwner->ApplySpellMod(GetId(), SPELLMOD_CHARGES, m_procCharges);
-    }
-    else
-        m_procCharges = -1;
+    m_procCharges = m_spellProto->procCharges;
+    if(modOwner)
+        modOwner->ApplySpellMod(GetId(), SPELLMOD_CHARGES, m_procCharges);
 
     m_isRemovedOnShapeLost = (m_caster_guid==m_target->GetGUID() && m_spellProto->Stances &&
                             !(m_spellProto->AttributesEx2 & 0x80000) && !(m_spellProto->Attributes & 0x10000));
@@ -973,7 +967,6 @@ void Aura::_AddAura()
                     SetAura(false);
                     SetAuraFlags((1 << GetEffIndex()) | AFLAG_NOT_CASTER | ((GetAuraMaxDuration() > 0) ? AFLAG_DURATION : AFLAG_NONE) | (IsPositive() ? AFLAG_POSITIVE : AFLAG_NEGATIVE));
                     SetAuraLevel(caster ? caster->getLevel() : sWorld.getConfig(CONFIG_MAX_PLAYER_LEVEL));
-                    UpdateAuraCharges();
                     SendAuraUpdate(false);
 
                     // update for out of range group members
@@ -1126,7 +1119,7 @@ void Aura::SendAuraUpdate(bool remove)
     uint8 auraFlags = GetAuraFlags();
     data << uint8(auraFlags);
     data << uint8(GetAuraLevel());
-    data << uint8(m_procCharges >= 0 ? m_procCharges : 0);
+    data << uint8(GetAuraCharges());
 
     if(!(auraFlags & AFLAG_NOT_CASTER))
     {
@@ -1210,7 +1203,7 @@ void Aura::HandleAddModifier(bool apply, bool Real)
             case 34754:    // Clearcasting
             case 34936:    // Backlash
             case 48108:    // Hot Streak
-                m_procCharges = 1;
+                SetAuraCharges(1);
                 break;
         }
 
@@ -1238,11 +1231,7 @@ void Aura::HandleAddModifier(bool apply, bool Real)
 
         mod->mask = (uint64)ptr[0] | (uint64)ptr[1]<<32;
         mod->mask2= (uint64)ptr[2];
-
-        if (m_procCharges > 0)
-            mod->charges = m_procCharges;
-        else
-            mod->charges = 0;
+        mod->charges = m_procCharges;
 
         m_spellmod = mod;
     }
@@ -4033,8 +4022,7 @@ void Aura::HandleAuraProcTriggerSpell(bool apply, bool Real)
         switch (GetId())
         {
             case 28200:                                     // Ascendance (Talisman of Ascendance trinket)
-                m_procCharges = 6;
-                UpdateAuraCharges();
+                SetAuraCharges(6);
                 break;
             default: break;
         }
@@ -5043,11 +5031,9 @@ void Aura::HandleAuraModRangedAttackPowerOfStatPercent(bool apply, bool Real)
     if(!Real)
         return;
 
-    if(m_target->GetTypeId() == TYPEID_PLAYER && (m_target->getClassMask() & CLASSMASK_WAND_USERS)!=0)
-        return;
-
     // Recalculate bonus
-    ((Player*)m_target)->UpdateAttackPowerAndDamage(true);
+    if(m_target->GetTypeId() == TYPEID_PLAYER && !(m_target->getClassMask() & CLASSMASK_WAND_USERS))
+        ((Player*)m_target)->UpdateAttackPowerAndDamage(true);
 }
 
 void Aura::HandleAuraModAttackPowerOfStatPercent(bool apply, bool Real)
@@ -5056,11 +5042,9 @@ void Aura::HandleAuraModAttackPowerOfStatPercent(bool apply, bool Real)
     if(!Real)
         return;
 
-    if(m_target->GetTypeId() == TYPEID_PLAYER && (m_target->getClassMask() & CLASSMASK_WAND_USERS)!=0)
-        return;
-
     // Recalculate bonus
-    ((Player*)m_target)->UpdateAttackPowerAndDamage(false);
+    if(m_target->GetTypeId() == TYPEID_PLAYER)
+        ((Player*)m_target)->UpdateAttackPowerAndDamage(false);
 }
 
 /********************************/

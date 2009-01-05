@@ -1208,7 +1208,7 @@ void Unit::CalculateMeleeDamage(Unit *pVictim, uint32 damage, CalcDamageInfo *da
     }
 
     // Physical Immune check
-    if(damageInfo->target->IsImmunedToDamage(SpellSchoolMask(damageInfo->damageSchoolMask),true))
+    if(damageInfo->target->IsImmunedToDamage(SpellSchoolMask(damageInfo->damageSchoolMask)))
     {
        damageInfo->HitInfo       |= HITINFO_NORMALSWING;
        damageInfo->TargetState    = VICTIMSTATE_IS_IMMUNE;
@@ -1684,7 +1684,7 @@ void Unit::CalcAbsorbResist(Unit *pVictim,SpellSchoolMask schoolMask, DamageEffe
         {
             if(Unit* caster = (*i)->GetCaster())
             {
-                AuraList const& vOverRideCS = caster->GetAurasByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
+                AuraList const& vOverRideCS = caster->GetAurasByType(SPELL_AURA_DUMMY);
                 for(AuraList::const_iterator k = vOverRideCS.begin(); k != vOverRideCS.end(); ++k)
                 {
                     switch((*k)->GetModifier()->m_miscvalue)
@@ -1692,8 +1692,6 @@ void Unit::CalcAbsorbResist(Unit *pVictim,SpellSchoolMask schoolMask, DamageEffe
                         case 5065:                          // Rank 1
                         case 5064:                          // Rank 2
                         case 5063:                          // Rank 3
-                        case 5062:                          // Rank 4
-                        case 5061:                          // Rank 5
                         {
                             if(RemainingDamage >= (*i)->GetModifier()->m_amount)
                                 reflectDamage = (*i)->GetModifier()->m_amount * (*k)->GetModifier()->m_amount/100;
@@ -2409,8 +2407,8 @@ SpellMissInfo Unit::SpellHitResult(Unit *pVictim, SpellEntry const *spell, bool 
     if (pVictim->GetTypeId()==TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
         return SPELL_MISS_EVADE;
 
-    // Check for immune (use charges)
-    if (pVictim->IsImmunedToSpell(spell,true))
+    // Check for immune
+    if (pVictim->IsImmunedToSpell(spell))
         return SPELL_MISS_IMMUNE;
 
     // All positive spells can`t miss
@@ -2418,8 +2416,8 @@ SpellMissInfo Unit::SpellHitResult(Unit *pVictim, SpellEntry const *spell, bool 
     if (IsPositiveSpell(spell->Id))
         return SPELL_MISS_NONE;
 
-    // Check for immune (use charges)
-    if (pVictim->IsImmunedToDamage(GetSpellSchoolMask(spell),true))
+    // Check for immune
+    if (pVictim->IsImmunedToDamage(GetSpellSchoolMask(spell)))
         return SPELL_MISS_IMMUNE;
 
     // Try victim reflect spell
@@ -4065,7 +4063,7 @@ void Unit::SendAttackStateUpdate(CalcDamageInfo *damageInfo)
             data << (uint32)damageInfo->resist;       // Resist
     }
 
-    data << (uint32)damageInfo->TargetState;
+    data << (uint8)damageInfo->TargetState;
     data << (uint32)0;
     data << (uint32)0;
 
@@ -4375,7 +4373,7 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 case 33493:
                 {
                     // Cast finish spell at last charge
-                    if (triggeredByAura->m_procCharges > 1)
+                    if (triggeredByAura->GetAuraCharges() > 1)
                         return false;
 
                     target = this;
@@ -4575,6 +4573,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     }
                     return false;
                 }
+                // Living Seed
+                case 48504:
+                {
+                    triggered_spell_id = 48503;
+                    basepoints0 = triggeredByAura->GetModifier()->m_amount;
+                    target = this;
+                    break;
+                }
             }
             break;
         }
@@ -4606,6 +4612,29 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 target = this;
                 triggered_spell_id = 29077;
                 break;
+            }
+            // Hot Streak
+            if (dummySpell->SpellIconID == 2999)
+            {
+                if (triggeredByAura->GetEffIndex()!=0)
+                    return true;
+                Aura *counter = GetAura(triggeredByAura->GetId(), 1);
+                if (!counter)
+                    return true;
+
+                // Count spell criticals in a row in second aura
+                Modifier *mod = counter->GetModifier();
+                if (procEx & PROC_EX_CRITICAL_HIT)
+                {
+                    mod->m_amount *=2;
+                    if (mod->m_amount < 100) // not enough
+                        return true;
+                    // Crititcal counted -> roll chance
+                    if (roll_chance_i(triggeredByAura->GetModifier()->m_amount))
+                       CastSpell(this, 48108, true, castItem, triggeredByAura);
+                }
+                mod->m_amount = 25;
+                return true;
             }
             // Incanter's Regalia set (add trigger chance to Mana Shield)
             if (dummySpell->SpellFamilyFlags & 0x0000000000008000LL)
@@ -4645,7 +4674,7 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 case 11129:
                 {
                     //last charge and crit
-                    if (triggeredByAura->m_procCharges <= 1 && (procEx & PROC_EX_CRITICAL_HIT) )
+                    if (triggeredByAura->GetAuraCharges() <= 1 && (procEx & PROC_EX_CRITICAL_HIT) )
                     {
                         RemoveAurasDueToSpell(28682);       //-> remove Combustion auras
                         return true;                        // charge counting (will removed)
@@ -4939,6 +4968,39 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     break;
                 }
             }
+            // Eclipse
+            if (dummySpell->SpellIconID == 2856)
+            {
+                if (!procSpell)
+                    return false;
+                // Only 0 aura can proc
+                if (triggeredByAura->GetEffIndex()!=0)
+                    return true;
+                // Wrath crit
+                if (procSpell->SpellFamilyFlags & 0x0000000000000001LL)
+                {
+                    if (!roll_chance_i(60))
+                        return false;
+                    triggered_spell_id = 48518;
+                    target = this;
+                    break;
+                }
+                // Starfire crit
+                if (procSpell->SpellFamilyFlags & 0x0000000000000004LL)
+                {
+                    triggered_spell_id = 48517;
+                    target = this;
+                    break;
+                }
+                return false;
+            }
+            // Living Seed
+            else if (dummySpell->SpellIconID == 2860)
+            {
+                triggered_spell_id = 48504;
+                basepoints0 = triggeredByAura->GetModifier()->m_amount * damage / 100;
+                break;
+            }
             break;
         }
         case SPELLFAMILY_ROGUE:
@@ -4960,11 +5022,6 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
             if( dummySpell->SpellIconID == 2116 )
             {
                 if(!procSpell)
-                    return false;
-
-                // only rogue's finishing moves (maybe need additional checks)
-                if( procSpell->SpellFamilyName!=SPELLFAMILY_ROGUE ||
-                    (procSpell->SpellFamilyFlags & SPELLFAMILYFLAG_ROGUE__FINISHING_MOVE) == 0)
                     return false;
 
                 // energy cost save
@@ -5146,6 +5203,33 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     if (!roll_chance_f(chance))
                         return false;
 
+                    break;
+                }
+                // Glyph of Divinity
+                case 54939:
+                {
+                    // Lookup base amount mana restore
+                    for (int i=0; i<3;i++)
+                        if (procSpell->Effect[i] == SPELL_EFFECT_ENERGIZE)
+                        {
+                            int32 mana = procSpell->EffectBasePoints[i];
+                            CastCustomSpell(this, 54986, 0, &mana, 0, true, castItem, triggeredByAura);
+                            break;
+                        }
+                    return true;
+                }
+                // Glyph of Flash of Light
+                case 54936:
+                {
+                    triggered_spell_id = 54957;
+                    basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
+                    break;
+                }
+                // Glyph of Holy Light
+                case 54937:
+                {
+                    triggered_spell_id = 54968;
+                    basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
                     break;
                 }
             }
@@ -5365,6 +5449,44 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     ((Player*)this)->AddSpellCooldown(dummySpell->Id,0,time(NULL) + cooldown);
 
                 return true;
+            }
+            // Glyph of Healing Wave
+            case 55440:
+            {
+                // Not proc from self heals
+                if (this==pVictim)
+                    return false;
+                basepoints0 = triggeredByAura->GetModifier()->m_amount * damage / 100;
+                target = this;
+                triggered_spell_id = 55533;
+                break;
+            }
+            break;
+        }
+        case SPELLFAMILY_DEATHKNIGHT:
+        {
+            // Vendetta
+            if (dummySpell->SpellFamilyFlags & 0x0000000000010000LL)
+            {
+                basepoints0 = triggeredByAura->GetModifier()->m_amount * GetMaxHealth() / 100;
+                triggered_spell_id = 50181;
+                target = this;
+                break;
+            }
+            // Necrosis
+            else if (dummySpell->SpellIconID == 2709)
+            {
+                basepoints0 = triggeredByAura->GetModifier()->m_amount * damage / 100;
+                triggered_spell_id = 51460;
+                break;
+            }
+            // Butchery
+            else if (dummySpell->SpellIconID == 2664)
+            {
+                basepoints0 = triggeredByAura->GetModifier()->m_amount;
+                triggered_spell_id = 50163;
+                target = this;
+                break;
             }
             break;
         }
@@ -6885,7 +7007,7 @@ uint32 Unit::SpellDamageBonus(Unit *pVictim, SpellEntry const *spellProto, uint3
         {
             //Molten Fury
             case 4920: case 4919:
-                if(pVictim->HasAuraState(AURA_STATE_HEALTHLESS_20_PERCENT))
+                if(pVictim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT))
                     TakenTotalMod *= (100.0f+(*i)->GetModifier()->m_amount)/100.0f; break;
         }
     }
@@ -7272,11 +7394,9 @@ bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolM
                     {
                         switch((*i)->GetModifier()->m_miscvalue)
                         {
-                            case 849: crit_chance+= 10.0f; break; //Shatter Rank 1
-                            case 910: crit_chance+= 20.0f; break; //Shatter Rank 2
-                            case 911: crit_chance+= 30.0f; break; //Shatter Rank 3
-                            case 912: crit_chance+= 40.0f; break; //Shatter Rank 4
-                            case 913: crit_chance+= 50.0f; break; //Shatter Rank 5
+                            case 849: crit_chance+= 17.0f; break; //Shatter Rank 1
+                            case 910: crit_chance+= 34.0f; break; //Shatter Rank 2
+                            case 911: crit_chance+= 50.0f; break; //Shatter Rank 3
                         }
                     }
                 }
@@ -7567,7 +7687,7 @@ int32 Unit::SpellBaseHealingBonusForVictim(SpellSchoolMask schoolMask, Unit *pVi
     return AdvertisedBenefit;
 }
 
-bool Unit::IsImmunedToDamage(SpellSchoolMask shoolMask, bool useCharges)
+bool Unit::IsImmunedToDamage(SpellSchoolMask shoolMask)
 {
     //If m_immuneToSchool type contain this school type, IMMUNE damage.
     SpellImmuneList const& schoolList = m_spellImmune[IMMUNITY_SCHOOL];
@@ -7584,7 +7704,7 @@ bool Unit::IsImmunedToDamage(SpellSchoolMask shoolMask, bool useCharges)
     return false;
 }
 
-bool Unit::IsImmunedToSpell(SpellEntry const* spellInfo, bool useCharges)
+bool Unit::IsImmunedToSpell(SpellEntry const* spellInfo)
 {
     if (!spellInfo)
         return false;
@@ -9766,6 +9886,11 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
 
         procTriggered.push_back( ProcTriggeredData(spellProcEvent, itr->second) );
     }
+
+    // Nothing found
+    if (procTriggered.empty())
+        return;
+
     // Handle effects proceed this time
     for(ProcTriggeredList::iterator i = procTriggered.begin(); i != procTriggered.end(); ++i)
     {
@@ -9800,7 +9925,7 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
         Modifier *auraModifier = triggeredByAura->GetModifier();
         SpellEntry const *spellInfo = triggeredByAura->GetSpellProto();
         uint32 effIndex = triggeredByAura->GetEffIndex();
-        bool useCharges = triggeredByAura->m_procCharges > 0;
+        bool useCharges = triggeredByAura->GetAuraCharges() > 0;
         // For players set spell cooldown if need
         uint32 cooldown = 0;
         if (GetTypeId() == TYPEID_PLAYER && spellProcEvent && spellProcEvent->cooldown)
@@ -9863,22 +9988,6 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
                     continue;
                 break;
             }
-            case SPELL_AURA_MOD_STUN:
-                // Remove by default, but if charge exist drop it
-                if (triggeredByAura->m_procCharges == 0)
-                   removedSpells.push_back(triggeredByAura->GetId());
-                break;
-            case SPELL_AURA_MELEE_ATTACK_POWER_ATTACKER_BONUS:
-            case SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS:
-                // Hunter's Mark (1-4 Rangs)
-                if (spellInfo->SpellFamilyName == SPELLFAMILY_HUNTER && (spellInfo->SpellFamilyFlags&0x0000000000000400LL))
-                {
-                    uint32 basevalue = triggeredByAura->GetBasePoints();
-                    auraModifier->m_amount += basevalue/10;
-                    if (auraModifier->m_amount > basevalue*4)
-                        auraModifier->m_amount = basevalue*4;
-                }
-                break;
             case SPELL_AURA_MOD_CASTING_SPEED:
                 // Skip melee hits or instant cast spells
                 if (procSpell == NULL || GetSpellCastTime(procSpell) == 0)
@@ -9919,18 +10028,16 @@ void Unit::ProcDamageAndSpellFor( bool isVictim, Unit * pTarget, uint32 procFlag
             AuraMap::const_iterator upper = GetAuras().upper_bound(i->triggeredByAura_SpellPair);
             for(AuraMap::const_iterator itr = lower; itr!= upper; ++itr)
             {
-                if(itr->second == i->triggeredByAura)
+                // If last charge dropped add spell to remove list
+                if(itr->second == i->triggeredByAura && triggeredByAura->DropAuraCharge())
                 {
-                     triggeredByAura->m_procCharges -=1;
-                     triggeredByAura->UpdateAuraCharges();
-                     if (triggeredByAura->m_procCharges <= 0)
-                          removedSpells.push_back(triggeredByAura->GetId());
+                    removedSpells.push_back(triggeredByAura->GetId());
                     break;
                 }
             }
         }
     }
-    if (removedSpells.size())
+    if (!removedSpells.empty())
     {
         // Sort spells and remove dublicates
         removedSpells.sort();
@@ -10652,10 +10759,10 @@ bool Unit::HandleMeandingAuraProc( Aura* triggeredByAura )
     uint64 caster_guid = triggeredByAura->GetCasterGUID();
 
     // jumps
-    int32 jumps = triggeredByAura->m_procCharges-1;
+    int32 jumps = triggeredByAura->GetAuraCharges()-1;
 
     // current aura expire
-    triggeredByAura->m_procCharges = 1;             // will removed at next charges decrease
+    triggeredByAura->SetAuraCharges(1);             // will removed at next charges decrease
 
     // next target selection
     if(jumps > 0 && GetTypeId()==TYPEID_PLAYER && IS_PLAYER_GUID(caster_guid))
