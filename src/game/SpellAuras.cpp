@@ -347,8 +347,6 @@ m_updated(false), m_isRemovedOnShapeLost(true), m_in_use(false)
 {
     assert(target);
 
-    int32 size = sizeof(Aura);
-
     assert(spellproto && spellproto == sSpellStore.LookupEntry( spellproto->Id ) && "`info` must be pointer to sSpellStore element");
 
     m_spellProto = spellproto;
@@ -2148,6 +2146,25 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
         {
             m_target->CastSpell(m_target,47287,true,NULL,this);
             return;
+        }
+
+        if (caster && m_removeMode == AURA_REMOVE_BY_DEATH)
+        {
+            // Stop caster Arcane Missle chanelling on death
+            if (m_spellProto->SpellFamilyName == SPELLFAMILY_MAGE && 
+                m_spellProto->SpellFamilyFlags&0x0000000000000800LL)
+            {
+                caster->InterruptSpell(CURRENT_CHANNELED_SPELL);
+                return;
+            }
+            // Stop caster Penance chanelling on death
+            if (m_spellProto->SpellFamilyName == SPELLFAMILY_PRIEST && 
+                m_spellProto->SpellFamilyFlags2 & 0x00000080)
+            {
+                caster->InterruptSpell(CURRENT_CHANNELED_SPELL);
+                return;
+            }
+
         }
     }
 
@@ -6600,8 +6617,12 @@ void Aura::PeriodicDummyTick()
         case SPELLFAMILY_DEATHKNIGHT:
         {
             // Death and Decay
-//            if (spell->SpellFamilyFlags & 0x0000000000000020LL)
-//                return;
+            if (spell->SpellFamilyFlags & 0x0000000000000020LL)
+            {
+                if (caster)
+                    caster->CastCustomSpell(m_target, 52212, &m_modifier.m_amount, NULL, NULL, true, 0, this);
+                return;
+            }
             // Raise Dead
 //            if (spell->SpellFamilyFlags & 0x0000000000001000LL)
 //                return;
