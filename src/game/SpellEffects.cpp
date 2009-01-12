@@ -385,6 +385,14 @@ void Spell::EffectSchoolDMG(uint32 effect_idx)
                 // Heroic Throw ${$m1+$AP*.50}
                 else if(m_spellInfo->SpellFamilyFlags & 0x0000000100000000LL)
                     damage+= uint32(m_caster->GetTotalAttackPowerValue(BASE_ATTACK) * 0.5f);
+                // Shockwave ${$m3/100*$AP}
+                else if(m_spellInfo->SpellFamilyFlags & 0x0000800000000000LL)
+                {
+                    int32 pct = m_caster->CalculateSpellDamage(m_spellInfo, 2, m_spellInfo->EffectBasePoints[2], unitTarget);
+                    if (pct > 0)
+                        damage+= int32(m_caster->GetTotalAttackPowerValue(BASE_ATTACK) * pct / 100);
+                    break;
+                }
                 break;
             }
             case SPELLFAMILY_WARLOCK:
@@ -1879,11 +1887,9 @@ void Spell::EffectTriggerSpell(uint32 i)
             {
                 // remove all harmful spells on you...
                 if( // ignore positive and passive auras
-                    !iter->second->IsPositive() && !iter->second->IsPassive()    &&
+                    !iter->second->IsPositive() && !iter->second->IsPassive() &&
                     // ignore physical auras
-                    (GetSpellSchoolMask(iter->second->GetSpellProto()) & SPELL_SCHOOL_MASK_NORMAL)==0 &&
-                    // ignore immunity persistent spells
-                    !( iter->second->GetSpellProto()->AttributesEx & 0x10000 ) )
+                    (GetSpellSchoolMask(iter->second->GetSpellProto()) & SPELL_SCHOOL_MASK_NORMAL)==0 )
                 {
                     m_caster->RemoveAurasDueToSpell(iter->second->GetSpellProto()->Id);
                     iter = Auras.begin();
