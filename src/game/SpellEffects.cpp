@@ -722,12 +722,6 @@ void Spell::EffectDummy(uint32 i)
                     m_caster->CastCustomSpell(unitTarget, 12721, &deepWoundsDotBasePoints0, NULL, NULL, true, NULL);
                     return;
                 }
-                case 12975:                                 //Last Stand
-                {
-                    int32 healthModSpellBasePoints0 = int32(m_caster->GetMaxHealth()*0.3);
-                    m_caster->CastCustomSpell(m_caster, 12976, &healthModSpellBasePoints0, NULL, NULL, true, NULL);
-                    return;
-                }
                 case 13120:                                 // net-o-matic
                 {
                     if(!unitTarget)
@@ -761,30 +755,6 @@ void Spell::EffectDummy(uint32 i)
                         default:
                             sLog.outError("EffectDummy: Non-handled case for spell 13567 for triggered aura %u",m_triggeredByAuraSpell->Id);
                             break;
-                    }
-                    return;
-                }
-                case 14185:                                 // Preparation Rogue
-                {
-                    if(m_caster->GetTypeId()!=TYPEID_PLAYER)
-                        return;
-
-                    //immediately finishes the cooldown on certain Rogue abilities
-                    const PlayerSpellMap& sp_list = ((Player *)m_caster)->GetSpellMap();
-                    for (PlayerSpellMap::const_iterator itr = sp_list.begin(); itr != sp_list.end(); ++itr)
-                    {
-                        uint32 classspell = itr->first;
-                        SpellEntry const *spellInfo = sSpellStore.LookupEntry(classspell);
-
-                        if (spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE && (spellInfo->SpellFamilyFlags & 0x26000000860LL))
-                        {
-                            ((Player*)m_caster)->RemoveSpellCooldown(classspell);
-
-                            WorldPacket data(SMSG_CLEAR_COOLDOWN, (4+8));
-                            data << uint32(classspell);
-                            data << uint64(m_caster->GetGUID());
-                            ((Player*)m_caster)->GetSession()->SendPacket(&data);
-                        }
                     }
                     return;
                 }
@@ -882,7 +852,7 @@ void Spell::EffectDummy(uint32 i)
 
                     return;
                 }
-                case 23074:                                 // Arc. Dragonling
+                case 23074:                                 // Arcanite Dragonling
                     if (!m_CastItem) return;
                     m_caster->CastSpell(m_caster,19804,true,m_CastItem);
                     return;
@@ -1290,18 +1260,34 @@ void Spell::EffectDummy(uint32 i)
                 if(!unitTarget)
                     return;
 
-                int32 basePoints0 = damage+int32(m_caster->GetPower(POWER_RAGE) * m_spellInfo->DmgMultiplier[i]);
+                uint32 rage = m_caster->GetPower(POWER_RAGE);
+                // Glyph of Execution bonus
+                if (Aura *aura = m_caster->GetDummyAura(58367))
+                    rage+=aura->GetModifier()->m_amount;
+
+                int32 basePoints0 = damage+int32(rage * m_spellInfo->DmgMultiplier[i] + 
+                                                 m_caster->GetTotalAttackPowerValue(BASE_ATTACK)*0.2f);
                 m_caster->CastCustomSpell(unitTarget, 20647, &basePoints0, NULL, NULL, true, 0);
                 m_caster->SetPower(POWER_RAGE,0);
                 return;
             }
-            if(m_spellInfo->Id==21977)                      //Warrior's Wrath
+            switch(m_spellInfo->Id)
             {
-                if(!unitTarget)
+                // Warrior's Wrath
+                case 21977:
+                {
+                    if(!unitTarget)
+                        return;
+                    m_caster->CastSpell(unitTarget,21887,true); // spell mod
                     return;
-
-                m_caster->CastSpell(unitTarget,21887,true); // spell mod
-                return;
+                }
+                // Last Stand
+                case 12975:
+                {
+                    int32 healthModSpellBasePoints0 = int32(m_caster->GetMaxHealth()*0.3);
+                    m_caster->CastCustomSpell(m_caster, 12976, &healthModSpellBasePoints0, NULL, NULL, true, NULL);
+                    return;
+                }
             }
             break;
         case SPELLFAMILY_WARLOCK:
@@ -1426,11 +1412,6 @@ void Spell::EffectDummy(uint32 i)
         case SPELLFAMILY_ROGUE:
             switch(m_spellInfo->Id )
             {
-                case 31231:                                 // Cheat Death
-                {
-                    m_caster->CastSpell(m_caster,45182,true);
-                    return;
-                }
                 case 5938:                                  // Shiv
                 {
                     if(m_caster->GetTypeId() != TYPEID_PLAYER)
@@ -1464,6 +1445,35 @@ void Spell::EffectDummy(uint32 i)
                     }
 
                     m_caster->CastSpell(unitTarget, 5940, true);
+                    return;
+                }
+                case 14185:                                 // Preparation Rogue
+                {
+                    if(m_caster->GetTypeId()!=TYPEID_PLAYER)
+                        return;
+
+                    //immediately finishes the cooldown on certain Rogue abilities
+                    const PlayerSpellMap& sp_list = ((Player *)m_caster)->GetSpellMap();
+                    for (PlayerSpellMap::const_iterator itr = sp_list.begin(); itr != sp_list.end(); ++itr)
+                    {
+                        uint32 classspell = itr->first;
+                        SpellEntry const *spellInfo = sSpellStore.LookupEntry(classspell);
+
+                        if (spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE && (spellInfo->SpellFamilyFlags & 0x0000024000000860LL))
+                        {
+                            ((Player*)m_caster)->RemoveSpellCooldown(classspell);
+
+                            WorldPacket data(SMSG_CLEAR_COOLDOWN, (4+8));
+                            data << uint32(classspell);
+                            data << uint64(m_caster->GetGUID());
+                            ((Player*)m_caster)->GetSession()->SendPacket(&data);
+                        }
+                    }
+                    return;
+                }
+                case 31231:                                 // Cheat Death
+                {
+                    m_caster->CastSpell(m_caster,45182,true);
                     return;
                 }
             }
@@ -1667,6 +1677,8 @@ void Spell::EffectDummy(uint32 i)
             //Shaman Rockbiter Weapon
             if (m_spellInfo->SpellFamilyFlags == 0x400000)
             {
+                // TODO: use expect spell for enchant (if exist talent)
+                // In 3.0.3 no mods present for rockbiter
                 uint32 spell_id = 0;
                 switch(m_spellInfo->Id)
                 {
@@ -1674,11 +1686,6 @@ void Spell::EffectDummy(uint32 i)
                     case  8018: spell_id = 36750; break;    // Rank 2
                     case  8019: spell_id = 36755; break;    // Rank 3
                     case 10399: spell_id = 36759; break;    // Rank 4
-                    case 16314: spell_id = 36763; break;    // Rank 5
-                    case 16315: spell_id = 36766; break;    // Rank 6
-                    case 16316: spell_id = 36771; break;    // Rank 7
-                    case 25479: spell_id = 36775; break;    // Rank 8
-                    case 25485: spell_id = 36499; break;    // Rank 9
                     default:
                         sLog.outError("Spell::EffectDummy: Spell %u not handled in RW",m_spellInfo->Id);
                         return;
@@ -1727,7 +1734,29 @@ void Spell::EffectDummy(uint32 i)
                 m_caster->CastCustomSpell(unitTarget,39609,&EffectBasePoints0,NULL,NULL,true,NULL,NULL,m_originalCasterGUID);
                 return;
             }
-
+            // Lava Lash
+            if (m_spellInfo->SpellFamilyFlags2 & 0x00000004)
+            {
+                if (m_caster->GetTypeId()!=TYPEID_PLAYER)
+                    return;
+                Item *item = ((Player*)m_caster)->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
+                if (item)
+                {
+                    // Damage is increased if your off-hand weapon is enchanted with Flametongue.
+                    Unit::AuraList const& auraDummy = m_caster->GetAurasByType(SPELL_AURA_DUMMY);
+                    for(Unit::AuraList::const_iterator itr = auraDummy.begin(); itr != auraDummy.end(); ++itr)
+                    {
+                        if( (*itr)->GetSpellProto()->SpellFamilyName==SPELLFAMILY_SHAMAN && 
+                            (*itr)->GetSpellProto()->SpellFamilyFlags & 0x0000000000200000LL &&
+                            (*itr)->GetCastItemGUID() == item->GetGUID())
+                        {
+                           m_damage += m_damage * damage / 100;
+                           return;
+                        }
+                    }
+                }
+                return;
+            }
             break;
     }
 
@@ -1984,12 +2013,7 @@ void Spell::EffectTriggerMissileSpell(uint32 effect_idx)
     if (m_CastItem)
         DEBUG_LOG("WORLD: cast Item spellId - %i", spellInfo->Id);
 
-    Spell *spell = new Spell(m_caster, spellInfo, true, m_originalCasterGUID );
-
-    SpellCastTargets targets;
-    targets.setDestination(m_targets.m_destX,m_targets.m_destY,m_targets.m_destZ);
-    spell->m_CastItem = m_CastItem;
-    spell->prepare(&targets, NULL);
+    m_caster->CastSpell(m_targets.m_destX, m_targets.m_destY, m_targets.m_destZ, spellInfo, true, m_CastItem, 0, m_originalCasterGUID);
 }
 
 void Spell::EffectTeleportUnits(uint32 i)
@@ -2802,7 +2826,7 @@ void Spell::EffectEnergisePct(uint32 i)
 
     uint32 gain = damage * maxPower / 100;
     unitTarget->ModifyPower(power, gain);
-    m_caster->SendEnergizeSpellLog(unitTarget, m_spellInfo->Id, damage, power);
+    m_caster->SendEnergizeSpellLog(unitTarget, m_spellInfo->Id, gain, power);
 }
 
 void Spell::SendLoot(uint64 guid, LootType loottype)
@@ -3788,35 +3812,34 @@ void Spell::EffectEnchantItemPerm(uint32 i)
 
     p_caster->UpdateCraftSkill(m_spellInfo->Id);
 
-    if (m_spellInfo->EffectMiscValue[i])
+    uint32 enchant_id = m_spellInfo->EffectMiscValue[i];
+    if (!enchant_id)
+        return;
+
+    SpellItemEnchantmentEntry const *pEnchant = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
+    if(!pEnchant)
+        return;
+
+    // item can be in trade slot and have owner diff. from caster
+    Player* item_owner = itemTarget->GetOwner();
+    if(!item_owner)
+        return;
+
+    if(item_owner!=p_caster && p_caster->GetSession()->GetSecurity() > SEC_PLAYER && sWorld.getConfig(CONFIG_GM_LOG_TRADE) )
     {
-        uint32 enchant_id = m_spellInfo->EffectMiscValue[i];
-
-        SpellItemEnchantmentEntry const *pEnchant = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
-        if(!pEnchant)
-            return;
-
-        // item can be in trade slot and have owner diff. from caster
-        Player* item_owner = itemTarget->GetOwner();
-        if(!item_owner)
-            return;
-
-        if(item_owner!=p_caster && p_caster->GetSession()->GetSecurity() > SEC_PLAYER && sWorld.getConfig(CONFIG_GM_LOG_TRADE) )
-        {
-            sLog.outCommand(p_caster->GetSession()->GetAccountId(),"GM %s (Account: %u) enchanting(perm): %s (Entry: %d) for player: %s (Account: %u)",
-                p_caster->GetName(),p_caster->GetSession()->GetAccountId(),
-                itemTarget->GetProto()->Name1,itemTarget->GetEntry(),
-                item_owner->GetName(),item_owner->GetSession()->GetAccountId());
-        }
-
-        // remove old enchanting before applying new if equipped
-        item_owner->ApplyEnchantment(itemTarget,PERM_ENCHANTMENT_SLOT,false);
-
-        itemTarget->SetEnchantment(PERM_ENCHANTMENT_SLOT, enchant_id, 0, 0);
-
-        // add new enchanting if equipped
-        item_owner->ApplyEnchantment(itemTarget,PERM_ENCHANTMENT_SLOT,true);
+        sLog.outCommand(p_caster->GetSession()->GetAccountId(),"GM %s (Account: %u) enchanting(perm): %s (Entry: %d) for player: %s (Account: %u)",
+            p_caster->GetName(),p_caster->GetSession()->GetAccountId(),
+            itemTarget->GetProto()->Name1,itemTarget->GetEntry(),
+            item_owner->GetName(),item_owner->GetSession()->GetAccountId());
     }
+
+    // remove old enchanting before applying new if equipped
+    item_owner->ApplyEnchantment(itemTarget,PERM_ENCHANTMENT_SLOT,false);
+
+    itemTarget->SetEnchantment(PERM_ENCHANTMENT_SLOT, enchant_id, 0, 0);
+
+    // add new enchanting if equipped
+    item_owner->ApplyEnchantment(itemTarget,PERM_ENCHANTMENT_SLOT,true);
 }
 
 void Spell::EffectEnchantItemTmp(uint32 i)
@@ -4975,59 +4998,44 @@ void Spell::EffectScriptEffect(uint32 effIndex)
     }
     else if( m_spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN )
     {
-        switch(m_spellInfo->SpellFamilyFlags)
+        // Judgement
+        if (m_spellInfo->SpellFamilyFlags & 0x0000000000800000LL)
         {
-            // Judgement
-            case 0x800000:
-            {
-                if(!unitTarget || !unitTarget->isAlive())
-                    return;
-                uint32 spellId2 = 0;
-
-                // all seals have aura dummy
-                Unit::AuraList const& m_dummyAuras = m_caster->GetAurasByType(SPELL_AURA_DUMMY);
-                for(Unit::AuraList::const_iterator itr = m_dummyAuras.begin(); itr != m_dummyAuras.end(); ++itr)
-                {
-                    SpellEntry const *spellInfo = (*itr)->GetSpellProto();
-
-                    // search seal (all seals have judgement's aura dummy spell id in 2 effect
-                    if ( !spellInfo || !IsSealSpell((*itr)->GetSpellProto()) || (*itr)->GetEffIndex() != 2 )
-                        continue;
-
-                    // must be calculated base at raw base points in spell proto, GetModifier()->m_value for S.Righteousness modified by SPELLMOD_DAMAGE
-                    spellId2 = (*itr)->GetSpellProto()->EffectBasePoints[2]+1;
-
-                    if(spellId2 <= 1)
-                        continue;
-
-                    // found, remove seal
-                    m_caster->RemoveAurasDueToSpell((*itr)->GetId());
-
-                    // Sanctified Judgement
-                    Unit::AuraList const& m_auras = m_caster->GetAurasByType(SPELL_AURA_DUMMY);
-                    for(Unit::AuraList::const_iterator i = m_auras.begin(); i != m_auras.end(); ++i)
-                    {
-                        if ((*i)->GetSpellProto()->SpellIconID == 205 && (*i)->GetSpellProto()->Attributes == 0x01D0LL)
-                        {
-                            int32 chance = (*i)->GetModifier()->m_amount;
-                            if ( roll_chance_i(chance) )
-                            {
-                                int32 mana = spellInfo->manaCost;
-                                if ( Player* modOwner = m_caster->GetSpellModOwner() )
-                                    modOwner->ApplySpellMod(spellInfo->Id, SPELLMOD_COST, mana);
-                                mana = int32(mana* 0.8f);
-                                m_caster->CastCustomSpell(m_caster,31930,&mana,NULL,NULL,true,NULL,*i);
-                            }
-                            break;
-                        }
-                    }
-
-                    break;
-                }
-
-                m_caster->CastSpell(unitTarget,spellId2,true);
+            if(!unitTarget || !unitTarget->isAlive())
                 return;
+            uint32 spellId1 = 0;
+            uint32 spellId2 = 0;
+
+            // Judgement self add switch
+            switch (m_spellInfo->Id)
+            {
+                case 41467: break;                           // Judgement
+                case 53407: spellId1 = 20184; break;         // Judgement of Justice
+                case 20271:                                  // Judgement of Light
+                case 57774: spellId1 = 20185; break;         // Judgement of Light
+                case 53408: spellId1 = 20186; break;         // Judgement of Wisdom
+                default:
+                    return;
             }
+            // all seals have aura dummy in 2 effect
+            Unit::AuraList const& m_dummyAuras = m_caster->GetAurasByType(SPELL_AURA_DUMMY);
+            for(Unit::AuraList::const_iterator itr = m_dummyAuras.begin(); itr != m_dummyAuras.end(); ++itr)
+            {
+                SpellEntry const *spellInfo = (*itr)->GetSpellProto();
+                // search seal (all seals have judgement's aura dummy spell id in 2 effect
+                if ((*itr)->GetEffIndex() != 2 || !spellInfo || !IsSealSpell(spellInfo))
+                    continue;
+                spellId2 = (*itr)->GetModifier()->m_amount;
+                SpellEntry const *judge = sSpellStore.LookupEntry(spellId2);
+                if (!judge)
+                    continue;
+                break;
+            }
+            if (spellId1)
+                m_caster->CastSpell(unitTarget, spellId1, true);
+            if (spellId2)
+                m_caster->CastSpell(unitTarget, spellId2, true);
+            return;
         }
     }
 

@@ -2501,12 +2501,8 @@ void Aura::HandleAuraHover(bool apply, bool Real)
 
 void Aura::HandleWaterBreathing(bool apply, bool Real)
 {
-    if(apply)
-        m_target->waterbreath = true;
-    else if(m_target->GetAurasByType(SPELL_AURA_WATER_BREATHING).empty())
+    if(!apply && !m_target->HasAuraType(SPELL_AURA_WATER_BREATHING))
     {
-        m_target->waterbreath = false;
-
         // update for enable timer in case not moving target
         if(m_target->GetTypeId()==TYPEID_PLAYER && m_target->IsInWorld())
         {
@@ -3110,9 +3106,9 @@ void Aura::HandleModPossessPet(bool apply, bool Real)
         return;
 
     if(apply)
-        pet->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNKNOWN5);
+        pet->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_24);
     else
-        pet->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNKNOWN5);
+        pet->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_24);
 
     ((Player*)caster)->SetFarSight(apply ? pet->GetGUID() : NULL);
     ((Player*)caster)->SetCharm(apply ? pet : NULL);
@@ -3273,7 +3269,7 @@ void Aura::HandleFeignDeath(bool apply, bool Real)
         m_target->SendMessageToSet(&data,true);
         */
                                                             // blizz like 2.0.x
-        m_target->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNKNOWN6);
+        m_target->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_29);
                                                             // blizz like 2.0.x
         m_target->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_FEIGN_DEATH);
                                                             // blizz like 2.0.x
@@ -3297,7 +3293,7 @@ void Aura::HandleFeignDeath(bool apply, bool Real)
         m_target->SendMessageToSet(&data,true);
         */
                                                             // blizz like 2.0.x
-        m_target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNKNOWN6);
+        m_target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_29);
                                                             // blizz like 2.0.x
         m_target->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_FEIGN_DEATH);
                                                             // blizz like 2.0.x
@@ -3443,10 +3439,6 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 m_target->SetVisibility(VISIBILITY_GROUP_NO_DETECT);
                 m_target->SetVisibility(VISIBILITY_GROUP_STEALTH);
             }
-
-            // for RACE_NIGHTELF stealth
-            if(m_target->GetTypeId()==TYPEID_PLAYER && GetId()==20580)
-                m_target->CastSpell(m_target, 21009, true, NULL, this);
         }
     }
     else
@@ -3454,10 +3446,6 @@ void Aura::HandleModStealth(bool apply, bool Real)
         // only at real aura remove
         if(Real)
         {
-            // for RACE_NIGHTELF stealth
-            if(m_target->GetTypeId()==TYPEID_PLAYER && GetId()==20580)
-                m_target->RemoveAurasDueToSpell(21009);
-
             // if last SPELL_AURA_MOD_STEALTH and no GM invisibility
             if(!m_target->HasAuraType(SPELL_AURA_MOD_STEALTH) && m_target->GetVisibility()!=VISIBILITY_OFF)
             {
@@ -3586,13 +3574,18 @@ void Aura::HandleAuraModRoot(bool apply, bool Real)
     if(!Real)
         return;
 
+    // Frost root aura -> freeze/unfreeze target
+    if (GetSpellSchoolMask(m_spellProto) & SPELL_SCHOOL_MASK_FROST)
+        m_target->ModifyAuraState(AURA_STATE_FROZEN, apply);
+
     uint32 apply_stat = UNIT_STAT_ROOT;
     if (apply)
     {
         m_target->addUnitState(UNIT_STAT_ROOT);
         m_target->SetUInt64Value (UNIT_FIELD_TARGET, 0);
-                                                            // probably wrong
-        m_target->SetFlag(UNIT_FIELD_FLAGS,(apply_stat<<16));
+// probably wrong (this add skinable flag)
+// TODO: find correct flag
+//        m_target->SetFlag(UNIT_FIELD_FLAGS,(apply_stat<<16));
 
         //Save last orientation
         if( m_target->getVictim() )
@@ -3618,8 +3611,9 @@ void Aura::HandleAuraModRoot(bool apply, bool Real)
             return;
 
         m_target->clearUnitState(UNIT_STAT_ROOT);
-                                                            // probably wrong
-        m_target->RemoveFlag(UNIT_FIELD_FLAGS,(apply_stat<<16));
+// probably wrong (this add skinable flag)
+// TODO: find correct flag
+//        m_target->RemoveFlag(UNIT_FIELD_FLAGS,(apply_stat<<16));
 
         if(!m_target->hasUnitState(UNIT_STAT_STUNNED))      // prevent allow move if have also stun effect
         {

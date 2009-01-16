@@ -103,7 +103,6 @@ Unit::Unit()
     //m_AurasCheck = 2000;
     //m_removeAuraTimer = 4;
     //tmpAura = NULL;
-    waterbreath = false;
 
     m_Visibility = VISIBILITY_ON;
 
@@ -1142,17 +1141,6 @@ void Unit::DealSpellDamage(SpellNonMeleeDamage *damageInfo, bool durabilityLoss)
             return;
     }
 
-    // update at damage Judgement aura duration that applied by attacker at victim
-    if(damageInfo->damage && spellProto->Id == 35395)
-    {
-        AuraMap& vAuras = pVictim->GetAuras();
-        for(AuraMap::iterator itr = vAuras.begin(); itr != vAuras.end(); ++itr)
-        {
-            SpellEntry const *spellInfo = (*itr).second->GetSpellProto();
-            if( spellInfo->AttributesEx3 & 0x40000 && spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN && ((*itr).second->GetCasterGUID() == GetGUID()))
-                (*itr).second->RefreshAura();
-        }
-    }
     // Call default DealDamage
     CleanDamage cleanDamage(damageInfo->cleanDamage, BASE_ATTACK, MELEE_HIT_NORMAL);
     DealDamage(pVictim, damageInfo->damage, &cleanDamage, SPELL_DIRECT_DAMAGE, SpellSchoolMask(damageInfo->schoolMask), spellProto, durabilityLoss);
@@ -1496,18 +1484,6 @@ void Unit::DealMeleeDamage(CalcDamageInfo *damageInfo, bool durabilityLoss)
 
         if(roll_chance_f(Probability))
             CastSpell(pVictim, 1604, true);
-    }
-
-    // update at damage Judgement aura duration that applied by attacker at victim
-    if(damageInfo->damage)
-    {
-        AuraMap& vAuras = pVictim->GetAuras();
-        for(AuraMap::iterator itr = vAuras.begin(); itr != vAuras.end(); ++itr)
-        {
-            SpellEntry const *spellInfo = (*itr).second->GetSpellProto();
-            if( spellInfo->AttributesEx3 & 0x40000 && spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN && ((*itr).second->GetCasterGUID() == GetGUID()))
-                (*itr).second->RefreshAura();
-        }
     }
 
     // If not miss
@@ -4738,6 +4714,30 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     target = this;
                     break;
                 }
+                // Divine purpose
+                case 31871:
+                case 31872:
+                {
+                    // Roll chane
+                    if (!roll_chance_i(triggeredByAura->GetModifier()->m_amount))
+                        return false;
+
+                    // Remove any stun effect on target
+                    AuraMap& Auras = pVictim->GetAuras();
+                    for(AuraMap::iterator iter = Auras.begin(); iter != Auras.end();)
+                    {
+                        SpellEntry const *spell = iter->second->GetSpellProto();
+                        if( spell->Mechanic == MECHANIC_STUN || 
+                            spell->EffectMechanic[iter->second->GetEffIndex()] == MECHANIC_STUN)
+                        {
+                            pVictim->RemoveAurasDueToSpell(spell->Id);
+                            iter = Auras.begin();
+                        }
+                        else
+                            ++iter;
+                    }
+                    return true;
+                }
             }
             break;
         }
@@ -5238,29 +5238,36 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 basepoints0 = GetAttackTime(BASE_ATTACK) * int32(ap*0.022f + 0.044f * holy) / 1000;
                 break;
             }
-            // Seal of Blood do damage trigger
-            if(dummySpell->SpellFamilyFlags & 0x0000040000000000LL)
+            // Sacred Shield
+            if (dummySpell->SpellFamilyFlags&0x0008000000000000LL)
             {
-                switch(triggeredByAura->GetEffIndex())
-                {
-                    case 0:
-                        triggered_spell_id = 31893;
-                        break;
-                    case 1:
-                    {
-                        // damage
-                        damage += CalculateDamage(BASE_ATTACK, false) * 35 / 100; // add spell damage from prev effect (35%)
-                        basepoints0 =  triggeredByAura->GetModifier()->m_amount * damage / 100;
-
-                        target = this;
-                        triggered_spell_id = 32221;
-                        break;
-                    }
-                }
+                triggered_spell_id = 58597;
+                target = this;
+                break;
             }
-
             switch(dummySpell->Id)
             {
+                // Judgement of Light
+                case 20185:
+                {
+                    // Get judgement caster
+                    Unit *caster = triggeredByAura->GetCaster();
+                    if (!caster)
+                        return false;
+                    float ap   = caster->GetTotalAttackPowerValue(BASE_ATTACK);
+                    int32 holy = caster->SpellBaseDamageBonus(SPELL_SCHOOL_MASK_HOLY) +
+                                 caster->SpellBaseDamageBonusForVictim(SPELL_SCHOOL_MASK_HOLY, this);
+                    basepoints0 = int32(ap*0.10f + 0.10f*holy);
+                    pVictim->CastCustomSpell(pVictim, 20267, &basepoints0, 0, 0, true, 0, triggeredByAura);
+                    return true;
+                }
+                // Judgement of Wisdom
+                case 20186:
+                {
+                    if (pVictim->getPowerType() == POWER_MANA)
+                        pVictim->CastSpell(pVictim, 20268, true, 0, triggeredByAura);
+                    return true;
+                }
                 // Holy Power (Redemption Armor set)
                 case 28789:
                 {
@@ -5313,6 +5320,40 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
                     target = this;
                     triggered_spell_id = 31786;
+                    break;
+                }
+                // Seal of Blood do damage trigger
+                case 31892:
+                {
+                    if (triggeredByAura->GetEffIndex() == 0)       // 0 effect - is proc on enemy
+                        triggered_spell_id = 31893;
+                    else if (triggeredByAura->GetEffIndex() == 1)  // 1 effect - is proc on self
+                    {
+                        // add spell damage from prev effect (27%)
+                        damage += CalculateDamage(BASE_ATTACK, false) * 27 / 100;
+                        basepoints0 =  triggeredByAura->GetModifier()->m_amount * damage / 100;
+                        target = this;
+                        triggered_spell_id = 32221;
+                    }
+                    else
+                        return true;
+                    break;
+                }
+                // Seal of the Martyr do damage trigger
+                case 53720:
+                {
+                    if (triggeredByAura->GetEffIndex() == 0)      // 0 effect - is proc on enemy
+                        triggered_spell_id = 53719;
+                    else if (triggeredByAura->GetEffIndex() == 1) // 1 effect - is proc on self
+                    {
+                        // add spell damage from prev effect (27%)
+                        damage += CalculateDamage(BASE_ATTACK, false) * 27 / 100;
+                        basepoints0 =  triggeredByAura->GetModifier()->m_amount * damage / 100;
+                        target = this;
+                        triggered_spell_id = 53718;
+                    }
+                    else
+                        return true;
                     break;
                 }
                 // Paladin Tier 6 Trinket (Ashtongue Talisman of Zeal)
@@ -7591,13 +7632,21 @@ bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolM
                 }
                 // Glyph of Shadowburn
                 if (spellProto->SpellFamilyName == SPELLFAMILY_WARLOCK &&
-                    spellProto->SpellFamilyFlags & 0x0000000000000080 && 
+                    spellProto->SpellFamilyFlags & 0x0000000000000080LL && 
                     pVictim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT))
                 {
                     AuraList const& mOverrideClassScript = GetAurasByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
                     for(AuraList::const_iterator i = mOverrideClassScript.begin(); i != mOverrideClassScript.end(); ++i)
                         if((*i)->GetModifier()->m_miscvalue == 7917)
                             crit_chance+=(*i)->GetModifier()->m_amount;
+                }
+                // Sacred Shield
+                if (spellProto->SpellFamilyName == SPELLFAMILY_PALADIN &&
+                    spellProto->SpellFamilyFlags & 0x0000000040000000LL)
+                {
+                    Aura *aura = pVictim->GetDummyAura(58597);
+                    if (aura && aura->GetCasterGUID() == GetGUID())
+                        crit_chance+=aura->GetModifier()->m_amount;
                 }
             }
             break;
@@ -9900,11 +9949,7 @@ void CharmInfo::SetPetNumber(uint32 petnumber, bool statwindow)
 
 bool Unit::isFrozen() const
 {
-    AuraList const& mRoot = GetAurasByType(SPELL_AURA_MOD_ROOT);
-    for(AuraList::const_iterator i = mRoot.begin(); i != mRoot.end(); ++i)
-        if( GetSpellSchoolMask((*i)->GetSpellProto()) & SPELL_SCHOOL_MASK_FROST)
-            return true;
-    return false;
+    return HasAuraState(AURA_STATE_FROZEN);
 }
 
 struct ProcTriggeredData
