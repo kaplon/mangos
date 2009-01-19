@@ -943,10 +943,6 @@ void Aura::_AddAura()
             break;
     }
 
-    // register aura
-    if (getDiminishGroup() != DIMINISHING_NONE )
-        m_target->ApplyDiminishingAura(getDiminishGroup(),true);
-
     Unit* caster = GetCaster();
 
     // passive auras (except totem auras) do not get placed in the slots
@@ -969,8 +965,12 @@ void Aura::_AddAura()
         //*****************************************************
         if (!secondaura)
         {
+            // register aura diminishing on apply
+            if (getDiminishGroup() != DIMINISHING_NONE )
+                m_target->ApplyDiminishingAura(getDiminishGroup(),true);
+
             // Update Seals information
-            if( IsSealSpell(GetSpellProto()) )
+            if (IsSealSpell(m_spellProto))
                 m_target->ModifyAuraState(AURA_STATE_JUDGEMENT, true);
 
             // Conflagrate aura state on Immolate
@@ -978,15 +978,15 @@ void Aura::_AddAura()
                 m_target->ModifyAuraState(AURA_STATE_IMMOLATE, true);
             
             // Faerie Fire (druid versions)
-            if( m_spellProto->SpellFamilyName == SPELLFAMILY_DRUID && m_spellProto->SpellFamilyFlags & 0x0000000000000400LL)
+            if (m_spellProto->SpellFamilyName == SPELLFAMILY_DRUID && m_spellProto->SpellFamilyFlags & 0x0000000000000400LL)
                 m_target->ModifyAuraState(AURA_STATE_FAERIE_FIRE, true);
 
             // Victorious
-            if( m_spellProto->SpellFamilyName == SPELLFAMILY_WARRIOR &&  m_spellProto->SpellFamilyFlags & 0x0004000000000000LL)
+            if (m_spellProto->SpellFamilyName == SPELLFAMILY_WARRIOR &&  m_spellProto->SpellFamilyFlags & 0x0004000000000000LL)
                 m_target->ModifyAuraState(AURA_STATE_WARRIOR_VICTORY_RUSH, true);
 
             // Swiftmend state on Regrowth & Rejuvenation
-            if(m_spellProto->SpellFamilyName == SPELLFAMILY_DRUID && m_spellProto->SpellFamilyFlags & 0x50 )
+            if (m_spellProto->SpellFamilyName == SPELLFAMILY_DRUID && m_spellProto->SpellFamilyFlags & 0x50 )
                 m_target->ModifyAuraState(AURA_STATE_SWIFTMEND, true);
 
             // Deadly poison aura state
@@ -1011,10 +1011,6 @@ void Aura::_RemoveAura()
         if (dynObj)
             dynObj->RemoveAffected(m_target);
     }
-
-    // unregister aura
-    if (getDiminishGroup() != DIMINISHING_NONE )
-        m_target->ApplyDiminishingAura(getDiminishGroup(),false);
 
     //passive auras do not get put in slots
     // Note: but totem can be not accessible for aura target in time remove (to far for find in grid)
@@ -1050,6 +1046,10 @@ void Aura::_RemoveAura()
     // only remove icon when the last aura of the spell is removed (current aura already removed from list)
     if (lastaura)
     {
+        // unregister aura diminishing (and store last time)
+        if (getDiminishGroup() != DIMINISHING_NONE )
+            m_target->ApplyDiminishingAura(getDiminishGroup(),false);
+
         SetAura(true);
         SetAuraFlags(AFLAG_NONE);
         SetAuraLevel(0);
@@ -1060,59 +1060,55 @@ void Aura::_RemoveAura()
 
         //*****************************************************
         // Update target aura state flag (at last aura remove)
-        // TODO: Make it easer
         //*****************************************************
-        // Update Seals information
-        if( IsSealSpell(GetSpellProto()) )
-            m_target->ModifyAuraState(AURA_STATE_JUDGEMENT,false);
-
-        // Conflagrate aura state
-        if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_WARLOCK && (GetSpellProto()->SpellFamilyFlags & 4))
-            m_target->ModifyAuraState(AURA_STATE_IMMOLATE, false);
-
-        // Faerie Fire (druid versions)
-        if( m_spellProto->SpellFamilyName == SPELLFAMILY_DRUID && m_spellProto->SpellFamilyFlags & 0x0000000000000400LL)
-            m_target->ModifyAuraState(AURA_STATE_FAERIE_FIRE, false);
-
-        // Victorious
-        if( m_spellProto->SpellFamilyName == SPELLFAMILY_WARRIOR &&  m_spellProto->SpellFamilyFlags & 0x0004000000000000LL)
-            m_target->ModifyAuraState(AURA_STATE_WARRIOR_VICTORY_RUSH, false);
-
-        // Swiftmend aura state
-        if(GetSpellProto()->SpellFamilyName == SPELLFAMILY_DRUID && GetSpellProto()->SpellFamilyFlags & 0x50)
+        uint32 removeState = 0;
+        switch(m_spellProto->SpellFamilyName)
         {
-            bool found = false;
-            Unit::AuraList const& RejorRegr = m_target->GetAurasByType(SPELL_AURA_PERIODIC_HEAL);
-            for(Unit::AuraList::const_iterator i = RejorRegr.begin(); i != RejorRegr.end(); ++i)
-            {
-                if((*i)->GetSpellProto()->SpellFamilyName == SPELLFAMILY_DRUID && (*i)->GetSpellProto()->SpellFamilyFlags & 0x50 )
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if(!found)
-                m_target->ModifyAuraState(AURA_STATE_SWIFTMEND, false);
+            case SPELLFAMILY_PALADIN:
+                if (IsSealSpell(m_spellProto))
+                    removeState = AURA_STATE_JUDGEMENT;     // Update Seals information
+                break;
+            case SPELLFAMILY_WARLOCK:
+                if(m_spellProto->SpellFamilyFlags & 4)
+                    removeState = AURA_STATE_IMMOLATE;      // Conflagrate aura state
+                break;
+            case SPELLFAMILY_DRUID:
+                if(m_spellProto->SpellFamilyFlags & 0x0000000000000400LL)
+                    removeState = AURA_STATE_FAERIE_FIRE;   // Faerie Fire (druid versions)
+                else if(m_spellProto->SpellFamilyFlags & 0x50)
+                    removeState = AURA_STATE_SWIFTMEND;     // Swiftmend aura state
+                break;
+            case SPELLFAMILY_WARRIOR:
+                if(m_spellProto->SpellFamilyFlags & 0x0004000000000000LL)
+                    removeState = AURA_STATE_WARRIOR_VICTORY_RUSH; // Victorious
+                break;
+            case SPELLFAMILY_ROGUE:
+                if(m_spellProto->SpellFamilyFlags & 0x10000)
+                    removeState = AURA_STATE_DEADLY_POISON; // Deadly poison aura state
+                break;
+            case SPELLFAMILY_HUNTER:
+                if(m_spellProto->SpellFamilyFlags & 0x1000000000000000LL)
+                    removeState = AURA_STATE_FAERIE_FIRE;   // Sting (hunter versions)
+
         }
-
-        // Deadly poison aura state
-        if(m_spellProto->SpellFamilyName == SPELLFAMILY_ROGUE && m_spellProto->SpellFamilyFlags & 0x10000)
+        // Remove state (but need check other auras for it)
+        if (removeState)
         {
-            // current aura already removed, search present of another
             bool found = false;
-            Unit::AuraList const& auras = m_target->GetAurasByType(SPELL_AURA_PERIODIC_DAMAGE);
-            for(Unit::AuraList::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
+            Unit::AuraMap& Auras = m_target->GetAuras();
+            for(Unit::AuraMap::iterator i = Auras.begin(); i != Auras.end(); ++i)
             {
-                SpellEntry const* itr_spell = (*itr)->GetSpellProto();
-                if(itr_spell && itr_spell->SpellFamilyName==SPELLFAMILY_ROGUE && itr_spell->SpellFamilyFlags & 0x10000)
+                SpellEntry const *auraSpellInfo = (*i).second->GetSpellProto();
+                if(auraSpellInfo->SpellFamilyName  == m_spellProto->SpellFamilyName && 
+                   auraSpellInfo->SpellFamilyFlags == m_spellProto->SpellFamilyFlags )
                 {
                     found = true;
                     break;
                 }
             }
-            // this has been last deadly poison aura
+            // this has been last aura
             if(!found)
-                m_target->ModifyAuraState(AURA_STATE_DEADLY_POISON,false);
+                m_target->ModifyAuraState(AuraState(removeState), false);
         }
 
         // reset cooldown state for spells
@@ -2087,7 +2083,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             ( GetSpellProto()->EffectApplyAuraName[0]==1 || GetSpellProto()->EffectApplyAuraName[0]==128 ) ) )
         {
             // spells with SpellEffect=72 and aura=4: 6196, 6197, 21171, 21425
-            ((Player*)m_target)->SetFarSight(NULL);
+            ((Player*)m_target)->SetFarSightGUID(0);
             WorldPacket data(SMSG_CLEAR_FAR_SIGHT_IMMEDIATE, 0);
             ((Player*)m_target)->GetSession()->SendPacket(&data);
             return;
@@ -2973,7 +2969,7 @@ void Aura::HandleBindSight(bool apply, bool Real)
     if(!caster || caster->GetTypeId() != TYPEID_PLAYER)
         return;
 
-    ((Player*)caster)->SetFarSight(apply ? m_target->GetGUID() : NULL);
+    ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
 void Aura::HandleFarSight(bool apply, bool Real)
@@ -2982,7 +2978,7 @@ void Aura::HandleFarSight(bool apply, bool Real)
     if(!caster || caster->GetTypeId() != TYPEID_PLAYER)
         return;
 
-    ((Player*)caster)->SetFarSight(apply ? m_target->GetGUID() : NULL);
+    ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
 void Aura::HandleAuraTrackCreatures(bool apply, bool Real)
@@ -3089,7 +3085,7 @@ void Aura::HandleModPossess(bool apply, bool Real)
         }
     }
     if(caster->GetTypeId() == TYPEID_PLAYER)
-        ((Player*)caster)->SetFarSight(apply ? m_target->GetGUID() : NULL);
+        ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
 void Aura::HandleModPossessPet(bool apply, bool Real)
@@ -3110,7 +3106,7 @@ void Aura::HandleModPossessPet(bool apply, bool Real)
     else
         pet->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_24);
 
-    ((Player*)caster)->SetFarSight(apply ? pet->GetGUID() : NULL);
+    ((Player*)caster)->SetFarSightGUID(apply ? pet->GetGUID() : NULL);
     ((Player*)caster)->SetCharm(apply ? pet : NULL);
     ((Player*)caster)->SetClientControl(pet, apply ? 1 : 0);
 
