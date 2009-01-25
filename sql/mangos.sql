@@ -22,7 +22,7 @@
 DROP TABLE IF EXISTS `db_version`;
 CREATE TABLE `db_version` (
   `version` varchar(120) default NULL,
-  `required_7133_02_mangos_spell_loot_template` bit(1) default NULL
+  `required_7168_01_mangos_command` bit(1) default NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=FIXED COMMENT='Used DB version notes';
 
 --
@@ -322,7 +322,7 @@ INSERT INTO `command` VALUES
 ('instance savedata',3,'Syntax: .instance savedata\r\n  Save the InstanceData for the current player\'s map to the DB.'),
 ('itemmove',2,'Syntax: .itemmove #sourceslotid #destinationslotid\r\n\r\nMove an item from slots #sourceslotid to #destinationslotid in your inventory\r\n\r\nNot yet implemented'),
 ('kick',2,'Syntax: .kick [$charactername]\r\n\r\nKick the given character name from the world. If no character name is provided then the selected player (except for yourself) will be kicked.'),
-('learn',3,'Syntax: .learn #parameter\r\n\r\nSelected character learn a spell of id #parameter.'),
+('learn',3,'Syntax: .learn #spell [all]\r\n\r\nSelected character learn a spell of id #spell. If \'all\' provided then all ranks learned.'),
 ('learn all',3,'Syntax: .learn all\r\n\r\nLearn all big set different spell maybe useful for Administaror.'),
 ('learn all_crafts',2,'Syntax: .learn crafts\r\n\r\nLearn all professions and recipes.'),
 ('learn all_default',1,'Syntax: .learn all_default [$playername]\r\n\r\nLearn for selected/$playername player all default spells for his race/class and spells rewarded by completed quests.'),
@@ -464,7 +464,7 @@ INSERT INTO `command` VALUES
 ('unban account',3,'Syntax is: unban account $Name\r\nUnban accounts for account name pattern.'),
 ('unban character',3,'Syntax is: unban character $Name\r\nUnban accounts for character name pattern.'),
 ('unban ip',3,'Syntax is: unban ip $Ip\r\nUnban accounts for IP pattern.'),
-('unlearn',3,'Syntax: .unlearn #startspell #endspell\r\n\r\nUnlearn for selected player the range of spells between id #startspell and #endspell. If no #endspell is provided, just unlearn spell of id #startspell.'),
+('unlearn',3,'Syntax: .unlearn #spell [all]\r\n\r\nUnlearn for selected player a spell #spell.  If \'all\' provided then all ranks unlearned.'),
 ('unmute',1,'Syntax: .unmute $playerName\r\n\r\nRestore chat messaging for any character from account of character $playerName.'),
 ('waterwalk',2,'Syntax: .waterwalk on/off\r\n\r\nSet on/off waterwalk state for selected player.'),
 ('wchange',3,'Syntax: .wchange #weathertype #status\r\n\r\nSet current weather to #weathertype with an intensity of #status.\r\n\r\n#weathertype can be 1 for rain, 2 for snow, and 3 for sand. #status can be 0 for disabled, and 1 for enabled.'),
@@ -819,7 +819,7 @@ CREATE TABLE `creature_template` (
 LOCK TABLES `creature_template` WRITE;
 /*!40000 ALTER TABLE `creature_template` DISABLE KEYS */;
 INSERT INTO `creature_template` VALUES
-(1,1,10045,0,10045,0,'Waypoint(Only GM can see it)','Visual',NULL,1,1,64,64,0,0,0,35,35,0,0.91,1,0,14,15,0,100,2000,2200,4096,0,8,0,0,0,0,1.76,2.42,100,8,5242886,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'',0,3,0,1,0,0,0x82,'');
+(1,1,10045,0,10045,0,'Waypoint(Only GM can see it)','Visual',NULL,1,1,64,64,0,0,0,35,35,0,0.91,1,0,14,15,0,100,2000,2200,4096,0,0,0,0,0,0,1.76,2.42,100,8,5242886,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'',0,3,0,1,0,0,0x82,'');
 /*!40000 ALTER TABLE `creature_template` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1445,6 +1445,7 @@ CREATE TABLE `instance_template` (
   `levelMin` tinyint(3) unsigned NOT NULL default '0',
   `levelMax` tinyint(3) unsigned NOT NULL default '0',
   `maxPlayers` tinyint(3) unsigned NOT NULL default '0',
+  `maxPlayersHeroic` tinyint(3) unsigned NOT NULL default '0',
   `reset_delay` int(10) unsigned NOT NULL default '0',
   `startLocX` float default NULL,
   `startLocY` float default NULL,
@@ -1461,32 +1462,35 @@ CREATE TABLE `instance_template` (
 LOCK TABLES `instance_template` WRITE;
 /*!40000 ALTER TABLE `instance_template` DISABLE KEYS */;
 INSERT INTO `instance_template` VALUES
-(33,0,22,30,10,7200,NULL,NULL,NULL,NULL,''),
-(34,0,24,32,10,7200,NULL,NULL,NULL,NULL,''),
-(36,0,15,20,10,7200,NULL,NULL,NULL,NULL,''),
-(43,0,15,21,10,7200,NULL,NULL,NULL,NULL,''),
-(47,0,29,38,10,7200,NULL,NULL,NULL,NULL,''),
-(48,0,24,32,10,7200,NULL,NULL,NULL,NULL,''),
-(70,0,35,47,10,7200,NULL,NULL,NULL,NULL,''),
-(90,0,29,38,10,7200,NULL,NULL,NULL,NULL,''),
-(109,0,45,55,10,7200,NULL,NULL,NULL,NULL,''),
-(129,0,37,46,10,7200,NULL,NULL,NULL,NULL,''),
-(189,0,34,45,10,7200,NULL,NULL,NULL,NULL,''),
-(209,0,44,54,10,7200,NULL,NULL,NULL,NULL,''),
-(229,0,58,0,10,120000,78.5083,-225.044,49.839,5.1,''),
-(230,0,52,0,5,7200,NULL,NULL,NULL,NULL,''),
-(249,0,60,0,40,432000,NULL,NULL,NULL,NULL,''),
-(289,0,57,0,5,7200,NULL,NULL,NULL,NULL,''),
-(309,0,60,0,20,259200,NULL,NULL,NULL,NULL,''),
-(329,0,58,60,5,7200,NULL,NULL,NULL,NULL,''),
-(349,0,46,55,10,7200,NULL,NULL,NULL,NULL,''),
-(389,0,13,18,10,7200,NULL,NULL,NULL,NULL,''),
-(409,0,60,0,40,604800,NULL,NULL,NULL,NULL,''),
-(429,0,55,60,5,7200,NULL,NULL,NULL,NULL,''),
-(469,0,60,0,40,604800,NULL,NULL,NULL,NULL,''),
-(509,0,60,0,20,259200,NULL,NULL,NULL,NULL,''),
-(531,0,60,0,40,604800,NULL,NULL,NULL,NULL,''),
-(533,0,60,0,40,604800,NULL,NULL,NULL,NULL,'');
+(33,0,22,30,10,10,7200,NULL,NULL,NULL,NULL,''),
+(34,0,24,32,10,10,7200,NULL,NULL,NULL,NULL,''),
+(36,0,15,20,10,10,7200,NULL,NULL,NULL,NULL,''),
+(43,0,15,21,10,10,7200,NULL,NULL,NULL,NULL,''),
+(47,0,29,38,10,10,7200,NULL,NULL,NULL,NULL,''),
+(48,0,24,32,10,10,7200,NULL,NULL,NULL,NULL,''),
+(70,0,35,47,10,10,7200,NULL,NULL,NULL,NULL,''),
+(90,0,29,38,10,10,7200,NULL,NULL,NULL,NULL,''),
+(109,0,45,55,10,10,7200,NULL,NULL,NULL,NULL,''),
+(129,0,37,46,10,10,7200,NULL,NULL,NULL,NULL,''),
+(189,0,34,45,10,10,7200,NULL,NULL,NULL,NULL,''),
+(209,0,44,54,10,10,7200,NULL,NULL,NULL,NULL,''),
+(229,0,58,0,10,10,120000,78.5083,-225.044,49.839,5.1,''),
+(230,0,52,0,5,5,7200,NULL,NULL,NULL,NULL,''),
+(249,0,60,0,40,40,432000,NULL,NULL,NULL,NULL,''),
+(289,0,57,0,5,5,7200,NULL,NULL,NULL,NULL,''),
+(309,0,60,0,20,20,259200,NULL,NULL,NULL,NULL,''),
+(329,0,58,60,5,5,7200,NULL,NULL,NULL,NULL,''),
+(349,0,46,55,10,10,7200,NULL,NULL,NULL,NULL,''),
+(389,0,13,18,10,10,7200,NULL,NULL,NULL,NULL,''),
+(409,0,60,0,40,40,604800,NULL,NULL,NULL,NULL,''),
+(429,0,55,60,5,5,7200,NULL,NULL,NULL,NULL,''),
+(469,0,60,0,40,40,604800,NULL,NULL,NULL,NULL,''),
+(509,0,60,0,20,20,259200,NULL,NULL,NULL,NULL,''),
+(531,0,60,0,40,40,604800,NULL,NULL,NULL,NULL,''),
+(533,0,80,0,10,25,0,NULL,NULL,NULL,NULL,''),
+(615,0,80,0,10,25,0,NULL,NULL,NULL,NULL,''),
+(616,0,80,0,10,25,0,NULL,NULL,NULL,NULL,''),
+(624,0,80,0,10,25,0,NULL,NULL,NULL,NULL,'');
 /*!40000 ALTER TABLE `instance_template` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -11765,6 +11769,7 @@ INSERT INTO `playercreateinfo_spell` VALUES
 (7,9,22027,'Remove Insignia'),
 (7,9,22810,'Opening - No Text'),
 (7,9,45927,'Summon Friend'),
+(7,9,58284,'Chaos Bolt Passive'),
 (7,9,61437,'Opening'),
 (8,1,78,'Heroic Strike'),
 (8,1,81,'Dodge'),
@@ -12379,6 +12384,7 @@ INSERT INTO `playercreateinfo_spell` VALUES
 (10,9,28730,'Arcane Torrent'),
 (10,9,28734,'Mana Tap'),
 (10,9,28877,'Arcane Affinity'),
+(10,9,58284,'Chaos Bolt Passive'),
 (11,1,78,'Heroic Strike'),
 (11,1,81,'Dodge'),
 (11,1,107,'Block'),
@@ -16856,6 +16862,7 @@ INSERT INTO `spell_proc_event` VALUES
 (44394, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000400, 0.000000, 0.000000,  0),
 (44395, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000400, 0.000000, 0.000000,  0),
 (44396, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000400, 0.000000, 0.000000,  0),
+(44401, 0x00000000,  3, 0x00200000, 0x00000000, 0x00000000, 0x00000000, 0x00000FFF, 0.000000, 0.000000,  0),
 (44404, 0x00000000,  3, 0x20000021, 0x00009000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (44445, 0x00000000,  3, 0x00000013, 0x00001000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (44446, 0x00000000,  3, 0x00000013, 0x00001000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
@@ -17042,8 +17049,8 @@ INSERT INTO `spell_proc_event` VALUES
 (53221, 0x00000000,  9, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (53222, 0x00000000,  9, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (53224, 0x00000000,  9, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
-(53228, 0x00000000,  9, 0x00000020, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
-(53232, 0x00000000,  9, 0x00000020, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
+(53228, 0x00000000,  9, 0x00000020, 0x01000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
+(53232, 0x00000000,  9, 0x00000020, 0x01000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (53256, 0x00000000,  9, 0x00000800, 0x00800001, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
 (53259, 0x00000000,  9, 0x00000800, 0x00800001, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
 (53260, 0x00000000,  9, 0x00000800, 0x00800001, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
@@ -17059,6 +17066,9 @@ INSERT INTO `spell_proc_event` VALUES
 (53384, 0x00000000, 10, 0x00800000, 0x00020000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
 (53486, 0x00000000, 10, 0x00800000, 0x00028000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
 (53488, 0x00000000, 10, 0x00800000, 0x00028000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
+(53501, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
+(53502, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
+(53503, 0x00000000,  0, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000002, 0.000000, 0.000000,  0),
 (53551, 0x00000000, 10, 0x00001000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (53552, 0x00000000, 10, 0x00001000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
 (53553, 0x00000000, 10, 0x00001000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0.000000, 0.000000,  0),
