@@ -20,15 +20,6 @@
 
 #include "SpellAuraDefines.h"
 
-struct DamageManaShield
-{
-    uint32 m_spellId;
-    uint32 m_modType;
-    int32 m_schoolType;
-    uint32 m_totalAbsorb;
-    uint32 m_currAbsorb;
-};
-
 struct Modifier
 {
     AuraType m_auraname;
@@ -217,6 +208,7 @@ class MANGOS_DLL_SPEC Aura
         void HandleAuraConvertRune(bool apply, bool Real);
         void HandleAuraIncreaseBaseHealthPercent(bool Apply, bool Real);
         void HandleNoReagentUseAura(bool Apply, bool Real);
+        void HandlePhase(bool Apply, bool Real);
 
         virtual ~Aura();
 

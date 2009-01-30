@@ -731,8 +731,8 @@ enum KeyRingSlots
 
 enum VanityPetSlots
 {
-    VANITYPET_SLOT_START        = 118,
-    VANITYPET_SLOT_END          = 136
+    VANITYPET_SLOT_START        = 118,                      // not use, vanity pets stored as spells
+    VANITYPET_SLOT_END          = 136                       // not alloed any content in.
 };
 
 enum CurrencyTokenSlots
@@ -2296,7 +2296,6 @@ class MANGOS_DLL_SPEC Player : public Unit
         time_t m_lastHonorUpdateTime;
 
         void outDebugValues() const;
-        bool _removeSpell(uint16 spell_id);
         uint64 m_lootGuid;
 
         uint32 m_race;

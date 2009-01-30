@@ -151,6 +151,13 @@ pkgdata_DATA = \
 	7150_01_mangos_playercreateinfo_spell.sql \
 	7156_01_mangos_spell_proc_event.sql \
 	7168_01_mangos_command.sql \
+	7175_01_mangos_spell_proc_event.sql \
+	7193_01_mangos_mangos_string.sql \
+	7196_01_mangos_spell_chain.sql \
+	7196_02_mangos_spell_bonus_data.sql \
+	7198_01_characters_characters.sql \
+	7199_01_mangos_spell_bonus_data.sql \
+	7199_02_mangos_spell_proc_event.sql \
 	README
 
 ## Additional files to include when running 'make dist'
@@ -282,4 +289,11 @@ EXTRA_DIST = \
 	7150_01_mangos_playercreateinfo_spell.sql \
 	7156_01_mangos_spell_proc_event.sql \
 	7168_01_mangos_command.sql \
+	7175_01_mangos_spell_proc_event.sql \
+	7193_01_mangos_mangos_string.sql \
+	7196_01_mangos_spell_chain.sql \
+	7196_02_mangos_spell_bonus_data.sql \
+	7198_01_characters_characters.sql \
+	7199_01_mangos_spell_bonus_data.sql \
+	7199_02_mangos_spell_proc_event.sql \
 	README
