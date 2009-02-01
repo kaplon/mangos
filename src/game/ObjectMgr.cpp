@@ -1042,8 +1042,8 @@ void ObjectMgr::LoadCreatures()
     QueryResult *result = WorldDatabase.Query("SELECT creature.guid, id, map, modelid,"
     //   4             5           6           7           8            9              10         11
         "equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, spawndist, currentwaypoint,"
-    //   12         13       14          15            16         17
-        "curhealth, curmana, DeathState, MovementType, spawnMask, event "
+    //   12         13       14          15            16         17         18
+        "curhealth, curmana, DeathState, MovementType, spawnMask, phaseMask, event "
         "FROM creature LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid");
 
     if(!result)
@@ -1091,7 +1091,8 @@ void ObjectMgr::LoadCreatures()
         data.is_dead        = fields[14].GetBool();
         data.movementType   = fields[15].GetUInt8();
         data.spawnMask      = fields[16].GetUInt8();
-        int16 gameEvent     = fields[17].GetInt16();
+        data.phaseMask      = fields[17].GetUInt16();
+        int16 gameEvent     = fields[18].GetInt16();
 
         CreatureInfo const* cInfo = GetCreatureTemplate(data.id);
         if(!cInfo)
@@ -1149,6 +1150,40 @@ void ObjectMgr::LoadCreatures()
             }
         }
 
+        if(data.phaseMask==0)
+        {
+            sLog.outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `phaseMask`=0 (not visible for anyone), set to 1.",guid,data.id );
+            data.phaseMask = 1;
+        }
+        else
+        {
+            int count = 0;
+            for(int i=0; i < sizeof(data.phaseMask)*8; ++i)
+                if(data.phaseMask & (1 << i))
+                    ++count;
+
+            if(count > 1)
+            {
+                uint32 phaseMask = data.phaseMask & ~PHASEMASK_NORMAL;
+                count = 0;
+                for(int i=0; i < sizeof(phaseMask)*8; ++i)
+                    if(phaseMask & (1 << i))
+                        ++count;
+
+                if(count > 1)
+                {
+                    sLog.outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with more single bit set in `phaseMask` (not visible for anyone), set to 1.",guid,data.id );
+                    data.phaseMask = phaseMask;
+                }
+                else
+                {
+                    sLog.outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with more single bit set in `phaseMask` (not visible for anyone), set to %u (possible expected).",guid,data.id,phaseMask);
+                    data.phaseMask = 1;
+                }
+
+            }
+        }
+
         if (gameEvent==0)                                   // if not this is to be managed by GameEvent System
             AddCreatureToGrid(guid, &data);
         ++count;
@@ -1199,8 +1234,8 @@ void ObjectMgr::LoadGameobjects()
 
     //                                                0                1   2    3           4           5           6
     QueryResult *result = WorldDatabase.Query("SELECT gameobject.guid, id, map, position_x, position_y, position_z, orientation,"
-    //   7          8          9          10         11             12            13     14         15
-        "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, event "
+    //   7          8          9          10         11             12            13     14         15         16
+        "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, phaseMask, event "
         "FROM gameobject LEFT OUTER JOIN game_event_gameobject ON gameobject.guid = game_event_gameobject.guid");
 
     if(!result)
@@ -1240,13 +1275,20 @@ void ObjectMgr::LoadGameobjects()
         data.go_state       = fields[13].GetUInt32();
         data.ArtKit         = 0;
         data.spawnMask      = fields[14].GetUInt8();
-        int16 gameEvent     = fields[15].GetInt16();
+        data.phaseMask      = fields[15].GetUInt16();
+        int16 gameEvent     = fields[16].GetInt16();
 
         GameObjectInfo const* gInfo = GetGameObjectInfo(data.id);
         if(!gInfo)
         {
             sLog.outErrorDb("Table `gameobject` have gameobject (GUID: %u) with not existed gameobject entry %u, skipped.",guid,data.id );
             continue;
+        }
+
+        if(data.phaseMask==0)
+        {
+            sLog.outErrorDb("Table `gameobject` have gameobject (GUID: %u Entry: %u) with `phaseMask`=0 (not visible for anyone), set to 1.",guid,data.id );
+            data.phaseMask = 1;
         }
 
         if (gameEvent==0)                                   // if not this is to be managed by GameEvent System
@@ -5737,10 +5779,10 @@ void ObjectMgr::LoadGameobjectInfo()
                 break;
             }
             case GAMEOBJECT_TYPE_CHAIR:                     //7
-                if(goInfo->chair.height > 2)
+                if(goInfo->chair.height > (UNIT_STAND_STATE_SIT_HIGH_CHAIR-UNIT_STAND_STATE_SIT_LOW_CHAIR) )
                 {
-                    sLog.outErrorDb("Gameobject (Entry: %u GoType: %u) have data1=%u but correct chair height in range 0..2.",
-                        id,goInfo->type,goInfo->chair.height);
+                    sLog.outErrorDb("Gameobject (Entry: %u GoType: %u) have data1=%u but correct chair height in range 0..%i.",
+                        id,goInfo->type,goInfo->chair.height,UNIT_STAND_STATE_SIT_HIGH_CHAIR-UNIT_STAND_STATE_SIT_LOW_CHAIR);
 
                     // prevent client and server unexpected work
                     const_cast<GameObjectInfo*>(goInfo)->chair.height = 0;
@@ -5835,6 +5877,16 @@ void ObjectMgr::LoadGameobjectInfo()
                 }
                 break;
             }
+            case GAMEOBJECT_TYPE_BARBER_CHAIR:              //32
+                if(goInfo->barberChair.chairheight > (UNIT_STAND_STATE_SIT_HIGH_CHAIR-UNIT_STAND_STATE_SIT_LOW_CHAIR) )
+                {
+                    sLog.outErrorDb("Gameobject (Entry: %u GoType: %u) have data1=%u but correct chair height in range 0..%i.",
+                        id,goInfo->type,goInfo->barberChair.chairheight,UNIT_STAND_STATE_SIT_HIGH_CHAIR-UNIT_STAND_STATE_SIT_LOW_CHAIR);
+
+                    // prevent client and server unexpected work
+                    const_cast<GameObjectInfo*>(goInfo)->barberChair.chairheight = 0;
+                }
+                break;
         }
     }
 
