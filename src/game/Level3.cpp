@@ -780,7 +780,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char* args)
 
     if(targetPlayer)
     {
-        ChatHandler(targetPlayer).PSendSysMessage(LANG_YOURS_SECURITY_CHANGED,GetName(), gm);
+        ChatHandler(targetPlayer).PSendSysMessage(LANG_YOURS_SECURITY_CHANGED,GetNameLink().c_str(), gm);
         targetPlayer->GetSession()->SetSecurity(gm);
     }
 
@@ -926,9 +926,11 @@ bool ChatHandler::HandleSetSkillCommand(const char* args)
         return false;
     }
 
+    std::string tNameLink = GetNameLink(target);
+
     if(!target->GetSkillValue(skill))
     {
-        PSendSysMessage(LANG_SET_SKILL_ERROR, target->GetName(), skill, sl->name[0]);
+        PSendSysMessage(LANG_SET_SKILL_ERROR, tNameLink.c_str(), skill, sl->name[0]);
         SetSentErrorMessage(true);
         return false;
     }
@@ -939,7 +941,7 @@ bool ChatHandler::HandleSetSkillCommand(const char* args)
         return false;
 
     target->SetSkill(skill, level, max);
-    PSendSysMessage(LANG_SET_SKILL, skill, sl->name[0], target->GetName(), level, max);
+    PSendSysMessage(LANG_SET_SKILL, skill, sl->name[0], tNameLink.c_str(), level, max);
 
     return true;
 }
@@ -986,10 +988,12 @@ bool ChatHandler::HandleCooldownCommand(const char* args)
         return false;
     }
 
+    std::string tNameLink = GetNameLink(target);
+
     if (!*args)
     {
         target->RemoveAllSpellCooldown();
-        PSendSysMessage(LANG_REMOVEALL_COOLDOWN, target->GetName());
+        PSendSysMessage(LANG_REMOVEALL_COOLDOWN, tNameLink.c_str());
     }
     else
     {
@@ -1000,7 +1004,7 @@ bool ChatHandler::HandleCooldownCommand(const char* args)
 
         if(!sSpellStore.LookupEntry(spell_id))
         {
-            PSendSysMessage(LANG_UNKNOWN_SPELL, target==m_session->GetPlayer() ? GetMangosString(LANG_YOU) : target->GetName());
+            PSendSysMessage(LANG_UNKNOWN_SPELL, target==m_session->GetPlayer() ? GetMangosString(LANG_YOU) : tNameLink.c_str());
             SetSentErrorMessage(true);
             return false;
         }
@@ -1010,7 +1014,7 @@ bool ChatHandler::HandleCooldownCommand(const char* args)
         data << uint64(target->GetGUID());
         target->GetSession()->SendPacket(&data);
         target->RemoveSpellCooldown(spell_id);
-        PSendSysMessage(LANG_REMOVE_COOLDOWN, spell_id, target==m_session->GetPlayer() ? GetMangosString(LANG_YOU) : target->GetName());
+        PSendSysMessage(LANG_REMOVE_COOLDOWN, spell_id, target==m_session->GetPlayer() ? GetMangosString(LANG_YOU) : tNameLink.c_str());
     }
     return true;
 }
@@ -1788,13 +1792,11 @@ bool ChatHandler::HandleLearnAllLangCommand(const char* /*args*/)
 
 bool ChatHandler::HandleLearnAllDefaultCommand(const char* args)
 {
-    char* pName = strtok((char*)args, "");
     Player *player = NULL;
-    if (pName)
+    if (*args)
     {
-        std::string name = pName;
-
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink((char*)args);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
@@ -1816,7 +1818,7 @@ bool ChatHandler::HandleLearnAllDefaultCommand(const char* args)
     player->learnDefaultSpells();
     player->learnQuestRewardedSpells();
 
-    PSendSysMessage(LANG_COMMAND_LEARN_ALL_DEFAULT_AND_QUEST,player->GetName());
+    PSendSysMessage(LANG_COMMAND_LEARN_ALL_DEFAULT_AND_QUEST,GetNameLink(player).c_str());
     return true;
 }
 
@@ -1852,7 +1854,7 @@ bool ChatHandler::HandleLearnCommand(const char* args)
         if(targetPlayer == m_session->GetPlayer())
             SendSysMessage(LANG_YOU_KNOWN_SPELL);
         else
-            PSendSysMessage(LANG_TARGET_KNOWN_SPELL,targetPlayer->GetName());
+            PSendSysMessage(LANG_TARGET_KNOWN_SPELL,GetNameLink(targetPlayer).c_str());
         SetSentErrorMessage(true);
         return false;
     }
@@ -1930,7 +1932,7 @@ bool ChatHandler::HandleAddItemCommand(const char* args)
     if (count < 0)
     {
         plTarget->DestroyItemCount(itemId, -count, true, false);
-        PSendSysMessage(LANG_REMOVEITEM, itemId, -count, plTarget->GetName());
+        PSendSysMessage(LANG_REMOVEITEM, itemId, -count, GetNameLink(plTarget).c_str());
         return true;
     }
 
@@ -3064,11 +3066,11 @@ bool ChatHandler::HandleGuildInviteCommand(const char *args)
     if (!targetGuild)
         return false;
 
-    std::string plName = par1;
-    if (!normalizePlayerName (plName))
+    std::string plName = extractPlayerNameFromLink(par1);
+    if(plName.empty())
     {
-        SendSysMessage (LANG_PLAYER_NOT_FOUND);
-        SetSentErrorMessage (true);
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
     }
 
@@ -3076,7 +3078,7 @@ bool ChatHandler::HandleGuildInviteCommand(const char *args)
     if (Player* targetPlayer = ObjectAccessor::Instance ().FindPlayerByName (plName.c_str ()))
         plGuid = targetPlayer->GetGUID ();
     else
-        plGuid = objmgr.GetPlayerGUIDByName (plName.c_str ());
+        plGuid = objmgr.GetPlayerGUIDByName (plName);
 
     if (!plGuid)
         false;
@@ -3097,11 +3099,11 @@ bool ChatHandler::HandleGuildUninviteCommand(const char *args)
     if(!par1)
         return false;
 
-    std::string plName = par1;
-    if (!normalizePlayerName (plName))
+    std::string plName = extractPlayerNameFromLink(par1);
+    if(plName.empty())
     {
-        SendSysMessage (LANG_PLAYER_NOT_FOUND);
-        SetSentErrorMessage (true);
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
     }
 
@@ -3114,7 +3116,7 @@ bool ChatHandler::HandleGuildUninviteCommand(const char *args)
     }
     else
     {
-        plGuid = objmgr.GetPlayerGUIDByName (plName.c_str ());
+        plGuid = objmgr.GetPlayerGUIDByName (plName);
         glId = Player::GetGuildIdFromDB (plGuid);
     }
 
@@ -3139,13 +3141,15 @@ bool ChatHandler::HandleGuildRankCommand(const char *args)
     char* par2 = strtok (NULL, " ");
     if (!par1 || !par2)
         return false;
-    std::string plName = par1;
-    if (!normalizePlayerName (plName))
+
+    std::string plName = extractPlayerNameFromLink(par1);
+    if(plName.empty())
     {
-        SendSysMessage (LANG_PLAYER_NOT_FOUND);
-        SetSentErrorMessage (true);
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
     }
+
 
     uint64 plGuid = 0;
     uint32 glId   = 0;
@@ -3156,7 +3160,7 @@ bool ChatHandler::HandleGuildRankCommand(const char *args)
     }
     else
     {
-        plGuid = objmgr.GetPlayerGUIDByName (plName.c_str ());
+        plGuid = objmgr.GetPlayerGUIDByName (plName);
         glId = Player::GetGuildIdFromDB (plGuid);
     }
 
@@ -3394,7 +3398,7 @@ bool ChatHandler::HandleModifyArenaCommand(const char * args)
 
     target->ModifyArenaPoints(amount);
 
-    PSendSysMessage(LANG_COMMAND_MODIFY_ARENA, target->GetName(), target->GetArenaPoints());
+    PSendSysMessage(LANG_COMMAND_MODIFY_ARENA, GetNameLink(target).c_str(), target->GetArenaPoints());
 
     return true;
 }
@@ -3405,8 +3409,8 @@ bool ChatHandler::HandleReviveCommand(const char* args)
 
     if (*args)
     {
-        std::string name = args;
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink((char*)args);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
@@ -3690,15 +3694,15 @@ bool ChatHandler::HandleExploreCheatCommand(const char* args)
 
     if (flag != 0)
     {
-        PSendSysMessage(LANG_YOU_SET_EXPLORE_ALL, chr->GetName());
+        PSendSysMessage(LANG_YOU_SET_EXPLORE_ALL, GetNameLink(chr).c_str());
         if (needReportToTarget(chr))
-            ChatHandler(chr).PSendSysMessage(LANG_YOURS_EXPLORE_SET_ALL,GetName());
+            ChatHandler(chr).PSendSysMessage(LANG_YOURS_EXPLORE_SET_ALL,GetNameLink().c_str());
     }
     else
     {
-        PSendSysMessage(LANG_YOU_SET_EXPLORE_NOTHING, chr->GetName());
+        PSendSysMessage(LANG_YOU_SET_EXPLORE_NOTHING, GetNameLink(chr).c_str());
         if (needReportToTarget(chr))
-            ChatHandler(chr).PSendSysMessage(LANG_YOURS_EXPLORE_SET_NOTHING,GetName());
+            ChatHandler(chr).PSendSysMessage(LANG_YOURS_EXPLORE_SET_NOTHING,GetNameLink().c_str());
     }
 
     for (uint8 i=0; i<128; i++)
@@ -3766,8 +3770,8 @@ bool ChatHandler::HandleLevelUpCommand(const char* args)
 
     if(pname)                                               // player by name
     {
-        name = pname;
-        if(!normalizePlayerName(name))
+        name = extractPlayerNameFromLink(pname);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
@@ -3797,7 +3801,7 @@ bool ChatHandler::HandleLevelUpCommand(const char* args)
             return false;
         }
 
-        name = chr->GetName();
+        name = GetNameLink(chr);
     }
 
     assert(chr || chr_guid);
@@ -3835,7 +3839,10 @@ bool ChatHandler::HandleLevelUpCommand(const char* args)
     }
 
     if(m_session->GetPlayer() != chr)                       // including chr==NULL
-        PSendSysMessage(LANG_YOU_CHANGE_LVL,name.c_str(),newlevel);
+    {
+        std::string nameLink = playerLink(name);
+        PSendSysMessage(LANG_YOU_CHANGE_LVL,nameLink.c_str(),newlevel);
+    }
     return true;
 }
 
@@ -4293,15 +4300,15 @@ bool ChatHandler::HandleResetHonorCommand (const char * args)
     Player *player = NULL;
     if (pName)
     {
-        std::string name = pName;
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink(pName);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
             return false;
         }
 
-        uint64 guid = objmgr.GetPlayerGUIDByName(name.c_str());
+        uint64 guid = objmgr.GetPlayerGUIDByName(name);
         player = objmgr.GetPlayer(guid);
     }
     else
@@ -4383,15 +4390,15 @@ bool ChatHandler::HandleResetLevelCommand(const char * args)
     Player *player = NULL;
     if (pName)
     {
-        std::string name = pName;
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink(pName);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
             return false;
         }
 
-        uint64 guid = objmgr.GetPlayerGUIDByName(name.c_str());
+        uint64 guid = objmgr.GetPlayerGUIDByName(name);
         player = objmgr.GetPlayer(guid);
     }
     else
@@ -4436,15 +4443,15 @@ bool ChatHandler::HandleResetStatsCommand(const char * args)
     Player *player = NULL;
     if (pName)
     {
-        std::string name = pName;
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink(pName);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
             return false;
         }
 
-        uint64 guid = objmgr.GetPlayerGUIDByName(name.c_str());
+        uint64 guid = objmgr.GetPlayerGUIDByName(name);
         player = objmgr.GetPlayer(guid);
     }
     else
@@ -4476,9 +4483,8 @@ bool ChatHandler::HandleResetSpellsCommand(const char * args)
     uint64 playerGUID = 0;
     if (pName)
     {
-        std::string name = pName;
-
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink(pName);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
@@ -4487,7 +4493,7 @@ bool ChatHandler::HandleResetSpellsCommand(const char * args)
 
         player = objmgr.GetPlayer(name.c_str());
         if(!player)
-            playerGUID = objmgr.GetPlayerGUIDByName(name.c_str());
+            playerGUID = objmgr.GetPlayerGUIDByName(name);
     }
     else
         player = getSelectedPlayer();
@@ -4504,9 +4510,8 @@ bool ChatHandler::HandleResetSpellsCommand(const char * args)
         player->resetSpells();
 
         ChatHandler(player).SendSysMessage(LANG_RESET_SPELLS);
-
         if(m_session->GetPlayer()!=player)
-            PSendSysMessage(LANG_RESET_SPELLS_ONLINE,player->GetName());
+            PSendSysMessage(LANG_RESET_SPELLS_ONLINE,GetNameLink(player).c_str());
     }
     else
     {
@@ -4524,8 +4529,8 @@ bool ChatHandler::HandleResetTalentsCommand(const char * args)
     uint64 playerGUID = 0;
     if (pName)
     {
-        std::string name = pName;
-        if(!normalizePlayerName(name))
+        std::string name = extractPlayerNameFromLink(pName);
+        if(name.empty())
         {
             SendSysMessage(LANG_PLAYER_NOT_FOUND);
             SetSentErrorMessage(true);
@@ -4534,7 +4539,7 @@ bool ChatHandler::HandleResetTalentsCommand(const char * args)
 
         player = objmgr.GetPlayer(name.c_str());
         if(!player)
-            playerGUID = objmgr.GetPlayerGUIDByName(name.c_str());
+            playerGUID = objmgr.GetPlayerGUIDByName(name);
     }
     else
         player = getSelectedPlayer();
@@ -4544,15 +4549,16 @@ bool ChatHandler::HandleResetTalentsCommand(const char * args)
         player->resetTalents(true);
 
         ChatHandler(player).SendSysMessage(LANG_RESET_TALENTS);
-
         if(m_session->GetPlayer()!=player)
-            PSendSysMessage(LANG_RESET_TALENTS_ONLINE,player->GetName());
+            PSendSysMessage(LANG_RESET_TALENTS_ONLINE,GetNameLink(player).c_str());
+
         return true;
     }
     else if (playerGUID)
     {
         CharacterDatabase.PExecute("UPDATE characters SET at_login = at_login | '%u' WHERE guid = '%u'",uint32(AT_LOGIN_RESET_TALENTS), GUID_LOPART(playerGUID) );
-        PSendSysMessage(LANG_RESET_TALENTS_OFFLINE,pName);
+        std::string nameLink = playerLink(pName);
+        PSendSysMessage(LANG_RESET_TALENTS_OFFLINE,nameLink.c_str());
         return true;
     }
     // Try reset talenents as Hunter Pet
@@ -4566,7 +4572,7 @@ bool ChatHandler::HandleResetTalentsCommand(const char * args)
             player = (Player *)owner;
             ChatHandler(player).SendSysMessage(LANG_RESET_TALENTS);
             if(m_session->GetPlayer()!=player)
-                PSendSysMessage(LANG_RESET_TALENTS_ONLINE,player->GetName());
+                PSendSysMessage(LANG_RESET_TALENTS_ONLINE,GetNameLink(player).c_str());
         }
         return true;
     }
@@ -5130,12 +5136,8 @@ bool ChatHandler::HandleBanInfoCharacterCommand(const char* args)
     if(!args)
         return false;
 
-    char* cname = strtok ((char*)args, "");
-    if(!cname)
-        return false;
-
-    std::string name = cname;
-    if(!normalizePlayerName(name))
+    std::string name = extractPlayerNameFromLink((char*)args);
+    if(name.empty())
     {
         SendSysMessage(LANG_PLAYER_NOT_FOUND);
         SetSentErrorMessage(true);
@@ -5462,9 +5464,9 @@ bool ChatHandler::HandleFlyModeCommand(const char* args)
     if(!args)
         return false;
 
-    Unit *unit = getSelectedUnit();
-    if (!unit || (unit->GetTypeId() != TYPEID_PLAYER))
-        unit = m_session->GetPlayer();
+    Player *target = getSelectedPlayer();
+    if (!target)
+        target = m_session->GetPlayer();
 
     WorldPacket data(12);
     if (strncmp(args, "on", 3) == 0)
@@ -5476,10 +5478,10 @@ bool ChatHandler::HandleFlyModeCommand(const char* args)
         SendSysMessage(LANG_USE_BOL);
         return false;
     }
-    data.append(unit->GetPackGUID());
+    data.append(target->GetPackGUID());
     data << uint32(0);                                      // unknown
-    unit->SendMessageToSet(&data, true);
-    PSendSysMessage(LANG_COMMAND_FLYMODE_STATUS, unit->GetName(), args);
+    target->SendMessageToSet(&data, true);
+    PSendSysMessage(LANG_COMMAND_FLYMODE_STATUS, GetNameLink(target).c_str(), args);
     return true;
 }
 
@@ -5635,12 +5637,11 @@ bool ChatHandler::HandleWritePDumpCommand(const char *args)
         guid = atoi(p2);
     else
     {
-        std::string name = p2;
-
-        if (!normalizePlayerName (name))
+        std::string name = extractPlayerNameFromLink(p2);
+        if(name.empty())
         {
-            SendSysMessage (LANG_PLAYER_NOT_FOUND);
-            SetSentErrorMessage (true);
+            SendSysMessage(LANG_PLAYER_NOT_FOUND);
+            SetSentErrorMessage(true);
             return false;
         }
 
@@ -6253,9 +6254,13 @@ bool ChatHandler::HandleSendItemsCommand(const char* args)
 
     // format: name "subject text" "mail text" item1[:count1] item2[:count2] ... item12[:count12]
 
-    char* pName = strtok((char*)args, " ");
-    if(!pName)
+    std::string name = extractPlayerNameFromLink((char*)args);
+    if(name.empty())
+    {
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
+    }
 
     char* tail1 = strtok(NULL, "");
     if(!tail1)
@@ -6293,8 +6298,7 @@ bool ChatHandler::HandleSendItemsCommand(const char* args)
     if (!msgText)
         return false;
 
-    // pName, msgSubject, msgText isn't NUL after prev. check
-    std::string name    = pName;
+    // msgSubject, msgText isn't NUL after prev. check
     std::string subject = msgSubject;
     std::string text    = msgText;
 
@@ -6352,13 +6356,6 @@ bool ChatHandler::HandleSendItemsCommand(const char* args)
         }
     }
 
-    if(!normalizePlayerName(name))
-    {
-        SendSysMessage(LANG_PLAYER_NOT_FOUND);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
     uint64 receiver_guid = objmgr.GetPlayerGUIDByName(name);
     if(!receiver_guid)
     {
@@ -6390,7 +6387,8 @@ bool ChatHandler::HandleSendItemsCommand(const char* args)
 
     WorldSession::SendMailTo(receiver,messagetype, stationery, sender_guidlo, GUID_LOPART(receiver_guid), subject, itemTextId, &mi, 0, 0, MAIL_CHECK_MASK_NONE);
 
-    PSendSysMessage(LANG_MAIL_SENT, name.c_str());
+    std::string nameLink = playerLink(name);
+    PSendSysMessage(LANG_MAIL_SENT, nameLink.c_str());
     return true;
 }
 
@@ -6402,9 +6400,13 @@ bool ChatHandler::HandleSendMoneyCommand(const char* args)
 
     /// format: name "subject text" "mail text" money
 
-    char* pName = strtok((char*)args, " ");
-    if (!pName)
+    std::string name = extractPlayerNameFromLink((char*)args);
+    if(name.empty())
+    {
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
+    }
 
     char* tail1 = strtok(NULL, "");
     if (!tail1)
@@ -6447,17 +6449,9 @@ bool ChatHandler::HandleSendMoneyCommand(const char* args)
     if (money <= 0)
         return false;
 
-    // pName, msgSubject, msgText isn't NUL after prev. check
-    std::string name    = pName;
+    // msgSubject, msgText isn't NUL after prev. check
     std::string subject = msgSubject;
     std::string text    = msgText;
-
-    if (!normalizePlayerName(name))
-    {
-        SendSysMessage(LANG_PLAYER_NOT_FOUND);
-        SetSentErrorMessage(true);
-        return false;
-    }
 
     uint64 receiver_guid = objmgr.GetPlayerGUIDByName(name);
     if (!receiver_guid)
@@ -6480,7 +6474,8 @@ bool ChatHandler::HandleSendMoneyCommand(const char* args)
 
     WorldSession::SendMailTo(receiver,messagetype, stationery, sender_guidlo, GUID_LOPART(receiver_guid), subject, itemTextId, NULL, money, 0, MAIL_CHECK_MASK_NONE);
 
-    PSendSysMessage(LANG_MAIL_SENT, name.c_str());
+    std::string nameLink = playerLink(name);
+    PSendSysMessage(LANG_MAIL_SENT, nameLink.c_str());
     return true;
 }
 
@@ -6488,15 +6483,16 @@ bool ChatHandler::HandleSendMoneyCommand(const char* args)
 bool ChatHandler::HandleSendMessageCommand(const char* args)
 {
     ///- Get the command line arguments
-    char* name_str = strtok((char*)args, " ");
-    char* msg_str = strtok(NULL, "");
-
-    if(!name_str || !msg_str)
+    std::string name = extractPlayerNameFromLink((char*)args);
+    if(name.empty())
+    {
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
         return false;
+    }
 
-    std::string name = name_str;
-
-    if(!normalizePlayerName(name))
+    char* msg_str = strtok(NULL, "");
+    if(!msg_str)
         return false;
 
     ///- Find the player and check that he is not logging out.
@@ -6521,7 +6517,8 @@ bool ChatHandler::HandleSendMessageCommand(const char* args)
     rPlayer->GetSession()->SendAreaTriggerMessage("|cffff0000[Message from administrator]:|r");
 
     //Confirmation message
-    PSendSysMessage(LANG_SENDMESSAGE,name.c_str(),msg_str);
+    std::string nameLink = playerLink(name);
+    PSendSysMessage(LANG_SENDMESSAGE,nameLink.c_str(),msg_str);
     return true;
 }
 
@@ -6585,10 +6582,10 @@ bool ChatHandler::HandleModifyGenderCommand(const char *args)
 
     char const* gender_full = gender ? "female" : "male";
 
-    PSendSysMessage(LANG_YOU_CHANGE_GENDER, player->GetName(), gender_full);
+    PSendSysMessage(LANG_YOU_CHANGE_GENDER, GetNameLink(player).c_str(), gender_full);
 
     if (needReportToTarget(player))
-        ChatHandler(player).PSendSysMessage(LANG_YOUR_GENDER_CHANGED, gender_full, GetName());
+        ChatHandler(player).PSendSysMessage(LANG_YOUR_GENDER_CHANGED, gender_full, GetNameLink().c_str());
 
     return true;
 }

@@ -51,7 +51,7 @@ void TrainerSpellData::Clear()
 {
     for (TrainerSpellList::iterator itr = spellList.begin(); itr != spellList.end(); ++itr)
         delete (*itr);
-    spellList.empty();
+    spellList.clear();
 }
 
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
@@ -304,10 +304,8 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData *data )
                 SetPvP(true);
     }
 
-    m_spells[0] = GetCreatureInfo()->spell1;
-    m_spells[1] = GetCreatureInfo()->spell2;
-    m_spells[2] = GetCreatureInfo()->spell3;
-    m_spells[3] = GetCreatureInfo()->spell4;
+    for(int i=0; i < CREATURE_MAX_SPELLS; ++i)
+        m_spells[i] = GetCreatureInfo()->spells[i];
 
     return true;
 }
