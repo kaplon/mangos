@@ -37,7 +37,7 @@
 #include "SpellAuras.h"
 #include "WaypointMovementGenerator.h"
 #include "InstanceData.h"
-#include "BattleGround.h"
+#include "BattleGroundMgr.h"
 #include "Util.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -650,12 +650,12 @@ bool Creature::isCanTrainingOf(Player* pPlayer, bool msg) const
     return true;
 }
 
-bool Creature::isCanIneractWithBattleMaster(Player* pPlayer, bool msg) const
+bool Creature::isCanInteractWithBattleMaster(Player* pPlayer, bool msg) const
 {
     if(!isBattleMaster())
         return false;
 
-    uint32 bgTypeId = objmgr.GetBattleMasterBG(GetEntry());
+    BattleGroundTypeId bgTypeId = sBattleGroundMgr.GetBattleMasterBG(GetEntry());
     if(!msg)
         return pPlayer->GetBGAccessByLevel(bgTypeId);
 
@@ -755,7 +755,7 @@ void Creature::prepareGossipMenu( Player *pPlayer,uint32 gossipid )
                             return;
                         break;
                     case GOSSIP_OPTION_BATTLEFIELD:
-                        if(!isCanIneractWithBattleMaster(pPlayer,false))
+                        if(!isCanInteractWithBattleMaster(pPlayer,false))
                             cantalking=false;
                         break;
                     case GOSSIP_OPTION_SPIRITGUIDE:
@@ -807,7 +807,7 @@ void Creature::prepareGossipMenu( Player *pPlayer,uint32 gossipid )
         }
         if(HasFlag(UNIT_NPC_FLAGS,UNIT_NPC_FLAG_BATTLEMASTER))
         {
-            isCanIneractWithBattleMaster(pPlayer,true);     // output error message if need
+            isCanInteractWithBattleMaster(pPlayer,true);     // output error message if need
         }
     }
 }
@@ -919,7 +919,7 @@ void Creature::OnGossipSelect(Player* player, uint32 option)
             break;
         case GOSSIP_OPTION_BATTLEFIELD:
         {
-            uint32 bgTypeId = objmgr.GetBattleMasterBG(GetEntry());
+            BattleGroundTypeId bgTypeId = sBattleGroundMgr.GetBattleMasterBG(GetEntry());
             player->GetSession()->SendBattlegGroundList( GetGUID(), bgTypeId );
             break;
         }

@@ -872,7 +872,7 @@ void Player::HandleDrowning()
         return;
     }
 
-    uint32 UnderWaterTime = 1*MINUTE*1000;                  // default length 1 min
+    uint32 UnderWaterTime = 3*MINUTE*1000;                  // default duration
 
     AuraList const& mModWaterBreathing = GetAurasByType(SPELL_AURA_MOD_WATER_BREATHING);
     for(AuraList::const_iterator i = mModWaterBreathing.begin(); i != mModWaterBreathing.end(); ++i)
@@ -3555,22 +3555,22 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     if (!trainer_spell)
         return TRAINER_SPELL_RED;
 
-    if (!trainer_spell->learned_spell)
+    if (!trainer_spell->learnedSpell)
         return TRAINER_SPELL_RED;
 
     // known spell
-    if(HasSpell(trainer_spell->learned_spell))
+    if(HasSpell(trainer_spell->learnedSpell))
         return TRAINER_SPELL_GRAY;
 
     // check race/class requirement
-    if(!IsSpellFitByClassAndRace(trainer_spell->learned_spell))
+    if(!IsSpellFitByClassAndRace(trainer_spell->learnedSpell))
         return TRAINER_SPELL_RED;
 
     // check level requirement
-    if(getLevel() < trainer_spell->reqlevel)
+    if(getLevel() < trainer_spell->reqLevel)
         return TRAINER_SPELL_RED;
 
-    if(SpellChainNode const* spell_chain = spellmgr.GetSpellChainNode(trainer_spell->learned_spell))
+    if(SpellChainNode const* spell_chain = spellmgr.GetSpellChainNode(trainer_spell->learnedSpell))
     {
         // check prev.rank requirement
         if(spell_chain->prev && !HasSpell(spell_chain->prev))
@@ -3582,11 +3582,11 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     }
 
     // check skill requirement
-    if(trainer_spell->reqskill && GetBaseSkillValue(trainer_spell->reqskill) < trainer_spell->reqskillvalue)
+    if(trainer_spell->reqSkill && GetBaseSkillValue(trainer_spell->reqSkill) < trainer_spell->reqSkillValue)
         return TRAINER_SPELL_RED;
 
     // exist, already checked at loading
-    SpellEntry const* spell = sSpellStore.LookupEntry(trainer_spell->learned_spell);
+    SpellEntry const* spell = sSpellStore.LookupEntry(trainer_spell->learnedSpell);
 
     // secondary prof. or not prof. spell
     uint32 skill = spell->EffectMiscValue[1];
@@ -18530,7 +18530,7 @@ bool Player::InArena() const
     return true;
 }
 
-bool Player::GetBGAccessByLevel(uint32 bgTypeId) const
+bool Player::GetBGAccessByLevel(BattleGroundTypeId bgTypeId) const
 {
     // get a template bg instead of running one
     BattleGround *bg = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
@@ -18858,6 +18858,7 @@ uint32 Player::GetResurrectionSpellId()
                 case 20764: spell_id = 20760; break;        // rank 4
                 case 20765: spell_id = 20761; break;        // rank 5
                 case 27239: spell_id = 27240; break;        // rank 6
+                case 47883: spell_id = 47882; break;        // rank 7
                 default:
                     sLog.outError("Unhandled spell %%u: S.Resurrection",(*itr)->GetId());
                     continue;
