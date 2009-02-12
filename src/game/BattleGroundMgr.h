@@ -207,6 +207,7 @@ class BattleGroundMgr
         void RemoveBattleGround(uint32 instanceID) { m_BattleGrounds.erase(instanceID); }
 
         void CreateInitialBattleGrounds();
+        void DeleteAlllBattleGrounds();
 
         void SendToBattleGround(Player *pl, uint32 InstanceID);
 
@@ -239,9 +240,9 @@ class BattleGroundMgr
 
         static bool IsArenaType(BattleGroundTypeId bgTypeId);
         static bool IsBattleGroundType(BattleGroundTypeId bgTypeId) { return !BattleGroundMgr::IsArenaType(bgTypeId); }
-        static uint32 BGQueueTypeId(BattleGroundTypeId bgTypeId, uint8 arenaType);
-        static BattleGroundTypeId BGTemplateId(uint32 bgQueueTypeId);
-        static uint8 BGArenaType(uint32 bgQueueTypeId);
+        static BattleGroundQueueTypeId BGQueueTypeId(BattleGroundTypeId bgTypeId, uint8 arenaType);
+        static BattleGroundTypeId BGTemplateId(BattleGroundQueueTypeId bgQueueTypeId);
+        static uint8 BGArenaType(BattleGroundQueueTypeId bgQueueTypeId);
     private:
         BattleMastersMap    mBattleMastersMap;
 

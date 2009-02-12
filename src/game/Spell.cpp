@@ -2378,7 +2378,7 @@ void Spell::handle_immediate()
         int32 duration = GetSpellDuration(m_spellInfo);
         if (duration)
         {
-            // Apply duration mod 
+            // Apply duration mod
             if(Player* modOwner = m_caster->GetSpellModOwner())
                 modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_DURATION, duration);
             m_spellState = SPELL_STATE_CASTING;
@@ -3825,7 +3825,8 @@ uint8 Spell::CanCast(bool strict)
                 return SPELL_FAILED_NOT_IN_ARENA;
 
     // zone check
-    if(uint8 res= GetSpellAllowedInLocationError(m_spellInfo,m_caster->GetMapId(),m_caster->GetZoneId(),m_caster->GetAreaId()))
+    if (uint8 res= GetSpellAllowedInLocationError(m_spellInfo,m_caster->GetMapId(),m_caster->GetZoneId(),m_caster->GetAreaId(),
+        m_caster->GetTypeId()==TYPEID_PLAYER ? ((Player*)m_caster)->GetBattleGroundId() : 0))
         return res;
 
     // not let players cast spells at mount (and let do it to creatures)

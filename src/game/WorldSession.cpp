@@ -304,10 +304,6 @@ void WorldSession::LogoutPlayer(bool Save)
             _player->RepopAtGraveyard();
         }
 
-        ///- Remove player from battleground (teleport to entrance)
-        if(_player->InBattleGround())
-            _player->LeaveBattleground();
-
         ///- Remove from OutdoorPvP
         sOutdoorPvPMgr.HandlePlayerLeaveZone(_player,_player->GetZoneId());
 
@@ -317,10 +313,10 @@ void WorldSession::LogoutPlayer(bool Save)
 
         for (int i=0; i < PLAYER_MAX_BATTLEGROUND_QUEUES; i++)
         {
-            if(int32 bgTypeId = _player->GetBattleGroundQueueId(i))
+            if(BattleGroundQueueTypeId bgQueueTypeId = _player->GetBattleGroundQueueTypeId(i))
             {
-                _player->RemoveBattleGroundQueueId(bgTypeId);
-                sBattleGroundMgr.m_BattleGroundQueues[ bgTypeId ].RemovePlayer(_player->GetGUID(), true);
+                _player->RemoveBattleGroundQueueId(bgQueueTypeId);
+                sBattleGroundMgr.m_BattleGroundQueues[ bgQueueTypeId ].RemovePlayer(_player->GetGUID(), true);
             }
         }
 

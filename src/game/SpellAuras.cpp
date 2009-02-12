@@ -426,9 +426,9 @@ m_updated(false), m_isRemovedOnShapeLost(true), m_in_use(false)
     if(modOwner)
         modOwner->ApplySpellMod(GetId(), SPELLMOD_CHARGES, m_procCharges);
 
-    m_isRemovedOnShapeLost = (m_caster_guid==m_target->GetGUID() && 
+    m_isRemovedOnShapeLost = (m_caster_guid==m_target->GetGUID() &&
                               m_spellProto->Stances &&
-                            !(m_spellProto->AttributesEx2 & SPELL_ATTR_EX2_NOT_NEED_SHAPESHIFT) && 
+                            !(m_spellProto->AttributesEx2 & SPELL_ATTR_EX2_NOT_NEED_SHAPESHIFT) &&
                             !(m_spellProto->Attributes & SPELL_ATTR_NOT_SHAPESHIFT));
 }
 
@@ -5736,6 +5736,7 @@ void Aura::PeriodicTick()
             Unit* target = m_target;                        // aura can be deleted in DealDamage
             SpellEntry const* spellProto = GetSpellProto();
             float multiplier = spellProto->EffectMultipleValue[GetEffIndex()] > 0 ? spellProto->EffectMultipleValue[GetEffIndex()] : 1;
+            int32 stackAmount = GetStackAmount();
 
             // Set trigger flag
             uint32 procAttacker = PROC_FLAG_ON_DO_PERIODIC;//   | PROC_FLAG_SUCCESSFUL_HARMFUL_SPELL_HIT;
@@ -5759,7 +5760,7 @@ void Aura::PeriodicTick()
             if(Player *modOwner = pCaster->GetSpellModOwner())
                 modOwner->ApplySpellMod(spellProto->Id, SPELLMOD_MULTIPLE_VALUE, multiplier);
 
-            uint32 heal = pCaster->SpellHealingBonus(pCaster, spellProto, uint32(new_damage * multiplier), DOT, GetStackAmount());
+            uint32 heal = pCaster->SpellHealingBonus(pCaster, spellProto, uint32(new_damage * multiplier), DOT, stackAmount);
 
             int32 gain = pCaster->ModifyHealth(heal);
             pCaster->getHostilRefManager().threatAssist(pCaster, gain * 0.5f, spellProto);
@@ -6040,7 +6041,7 @@ void Aura::PeriodicTick()
             Powers pt = m_target->getPowerType();
             if(int32(pt) != m_modifier.m_miscvalue)
                 return;
-            
+
             if ( GetSpellProto()->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_SEATED )
             {
                 // eating anim
@@ -6051,7 +6052,7 @@ void Aura::PeriodicTick()
                 // cannibalize anim
                 m_target->HandleEmoteCommand(EMOTE_STATE_CANNIBALIZE);
             }
-            
+
             // Warrior talent, gain 1 rage every 3 seconds while in combat
             if(pt == POWER_RAGE && m_target->isInCombat())
                 m_target->ModifyPower(pt, m_modifier.m_amount*10/17);
