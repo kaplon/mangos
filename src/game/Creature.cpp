@@ -47,18 +47,11 @@
 // apply implementation of the singletons
 #include "Policies/SingletonImp.h"
 
-void TrainerSpellData::Clear()
-{
-    for (TrainerSpellList::iterator itr = spellList.begin(); itr != spellList.end(); ++itr)
-        delete (*itr);
-    spellList.clear();
-}
-
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
 {
-    for(TrainerSpellList::const_iterator itr = spellList.begin(); itr != spellList.end(); ++itr)
-        if((*itr)->spell == spell_id)
-            return *itr;
+    TrainerSpellMap::const_iterator itr = spellList.find(spell_id);
+    if (itr != spellList.end())
+        return &itr->second;
 
     return NULL;
 }
@@ -706,7 +699,7 @@ void Creature::prepareGossipMenu( Player *pPlayer,uint32 gossipid )
             if(gso->Id==1)
             {
                 uint32 textid=GetNpcTextId();
-                GossipText * gossiptext=objmgr.GetGossipText(textid);
+                GossipText const* gossiptext=objmgr.GetGossipText(textid);
                 if(!gossiptext)
                     cantalking=false;
             }
@@ -817,8 +810,8 @@ void Creature::sendPreparedGossip(Player* player)
     if(!player)
         return;
 
-    // in case empty gossip menu open quest menu if any
-    if (player->PlayerTalkClass->GetGossipMenu().Empty() && !player->PlayerTalkClass->GetQuestMenu().Empty())
+    // in case no gossip flag and quest menu not empty, open quest menu (client expect gossip menu with this flag)
+    if (!HasFlag(UNIT_NPC_FLAGS,UNIT_NPC_FLAG_GOSSIP) && !player->PlayerTalkClass->GetQuestMenu().Empty())
     {
         player->SendPreparedQuest(GetGUID());
         return;

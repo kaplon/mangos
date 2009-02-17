@@ -280,9 +280,10 @@ class ObjectMgr
         typedef UNORDERED_MAP<uint32, Item*> ItemMap;
 
         typedef std::set< Group * > GroupSet;
-        typedef std::set< Guild * > GuildSet;
 
-        typedef UNORDERED_MAP<uint32, ArenaTeam* > ArenaTeamMap;
+        typedef UNORDERED_MAP<uint32, Guild *> GuildMap;
+
+        typedef UNORDERED_MAP<uint32, ArenaTeam*> ArenaTeamMap;
 
         typedef UNORDERED_MAP<uint32, Quest*> QuestMap;
 
@@ -311,17 +312,17 @@ class ObjectMgr
         void RemoveGroup(Group* group) { mGroupSet.erase( group ); }
 
         Guild* GetGuildByLeader(uint64 const&guid) const;
-        Guild* GetGuildById(const uint32 GuildId) const;
+        Guild* GetGuildById(uint32 GuildId) const;
         Guild* GetGuildByName(const std::string& guildname) const;
-        std::string GetGuildNameById(const uint32 GuildId) const;
-        void AddGuild(Guild* guild) { mGuildSet.insert( guild ); }
-        void RemoveGuild(Guild* guild) { mGuildSet.erase( guild ); }
+        std::string GetGuildNameById(uint32 GuildId) const;
+        void AddGuild(Guild* guild);
+        void RemoveGuild(uint32 Id);
 
-        ArenaTeam* GetArenaTeamById(const uint32 arenateamid) const;
+        ArenaTeam* GetArenaTeamById(uint32 arenateamid) const;
         ArenaTeam* GetArenaTeamByName(const std::string& arenateamname) const;
         ArenaTeam* GetArenaTeamByCaptain(uint64 const& guid) const;
         void AddArenaTeam(ArenaTeam* arenaTeam);
-        void RemoveArenaTeam(ArenaTeam* arenaTeam);
+        void RemoveArenaTeam(uint32 Id);
         ArenaTeamMap::iterator GetArenaTeamMapBegin() { return mArenaTeamMap.begin(); }
         ArenaTeamMap::iterator GetArenaTeamMapEnd()   { return mArenaTeamMap.end(); }
 
@@ -402,8 +403,7 @@ class ObjectMgr
             return false;
         }
 
-        void AddGossipText(GossipText *pGText);
-        GossipText *GetGossipText(uint32 Text_ID);
+        GossipText const* GetGossipText(uint32 Text_ID) const;
 
         WorldSafeLocsEntry const *GetClosestGraveYard(float x, float y, float z, uint32 MapId, uint32 team);
         bool AddGraveYardLink(uint32 id, uint32 zone, uint32 team, bool inDB = true);
@@ -748,17 +748,15 @@ class ObjectMgr
 
         QuestMap            mQuestTemplates;
 
-        typedef UNORDERED_MAP<uint32, GossipText*> GossipTextMap;
+        typedef UNORDERED_MAP<uint32, GossipText> GossipTextMap;
         typedef UNORDERED_MAP<uint32, uint32> QuestAreaTriggerMap;
         typedef UNORDERED_MAP<uint32, std::string> ItemTextMap;
         typedef std::set<uint32> TavernAreaTriggerSet;
         typedef std::set<uint32> GameObjectForQuestSet;
 
         GroupSet            mGroupSet;
-        GuildSet            mGuildSet;
+        GuildMap            mGuildMap;
         ArenaTeamMap        mArenaTeamMap;
-
-        ItemMap             mItems;
 
         ItemTextMap         mItemTexts;
 

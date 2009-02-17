@@ -210,6 +210,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "ps",             SEC_ADMINISTRATOR,  false, &ChatHandler::HandlePlaySound2Command,          "", NULL },
         { "scn",            SEC_ADMINISTRATOR,  false, &ChatHandler::HandleSendChannelNotifyCommand,   "", NULL },
         { "scm",            SEC_ADMINISTRATOR,  false, &ChatHandler::HandleSendChatMsgCommand,         "", NULL },
+        { "sps",            SEC_ADMINISTRATOR,  false, &ChatHandler::HandleSendSetPhaseShiftCommand,   "", NULL },
         { "getitemstate",   SEC_ADMINISTRATOR,  false, &ChatHandler::HandleGetItemState,               "", NULL },
         { "playsound",      SEC_MODERATOR,      false, &ChatHandler::HandlePlaySoundCommand,           "", NULL },
         { "update",         SEC_ADMINISTRATOR,  false, &ChatHandler::HandleUpdate,                     "", NULL },
@@ -438,6 +439,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "whisper",        SEC_MODERATOR,      false, &ChatHandler::HandleNpcWhisperCommand,          "", NULL },
         { "yell",           SEC_MODERATOR,      false, &ChatHandler::HandleNpcYellCommand,             "", NULL },
         { "tame",           SEC_GAMEMASTER,     false, &ChatHandler::HandleNpcTameCommand,             "", NULL },
+        { "setdeathstate",  SEC_GAMEMASTER,     false, &ChatHandler::HandleNpcSetDeathStateCommand,    "", NULL },
 
         //{ TODO: fix or remove this commands
         { "name",           SEC_GAMEMASTER,     false, &ChatHandler::HandleNameCommand,                "", NULL },

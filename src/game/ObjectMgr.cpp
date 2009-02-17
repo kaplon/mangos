@@ -140,24 +140,10 @@ ObjectMgr::ObjectMgr()
 ObjectMgr::~ObjectMgr()
 {
     for( QuestMap::iterator i = mQuestTemplates.begin( ); i != mQuestTemplates.end( ); ++i )
-    {
         delete i->second;
-    }
-    mQuestTemplates.clear( );
-
-    for( GossipTextMap::iterator i = mGossipText.begin( ); i != mGossipText.end( ); ++i )
-    {
-        delete i->second;
-    }
-    mGossipText.clear( );
-
-    mAreaTriggers.clear();
 
     for(PetLevelInfoMap::iterator i = petInfo.begin( ); i != petInfo.end( ); ++i )
-    {
         delete[] i->second;
-    }
-    petInfo.clear();
 
     // free only if loaded
     for (int class_ = 0; class_ < MAX_CLASSES; ++class_)
@@ -170,8 +156,9 @@ ObjectMgr::~ObjectMgr()
     // free group and guild objects
     for (GroupSet::iterator itr = mGroupSet.begin(); itr != mGroupSet.end(); ++itr)
         delete (*itr);
-    for (GuildSet::iterator itr = mGuildSet.begin(); itr != mGuildSet.end(); ++itr)
-        delete (*itr);
+
+    for (GuildMap::iterator itr = mGuildMap.begin(); itr != mGuildMap.end(); ++itr)
+        delete itr->second;
 
     for (CacheVendorItemMap::iterator itr = m_mCacheVendorItemMap.begin(); itr != m_mCacheVendorItemMap.end(); ++itr)
         itr->second.Clear();
@@ -189,43 +176,53 @@ Group * ObjectMgr::GetGroupByLeader(const uint64 &guid) const
     return NULL;
 }
 
-Guild * ObjectMgr::GetGuildById(const uint32 GuildId) const
+Guild * ObjectMgr::GetGuildById(uint32 GuildId) const
 {
-    for(GuildSet::const_iterator itr = mGuildSet.begin(); itr != mGuildSet.end(); ++itr)
-        if ((*itr)->GetId() == GuildId)
-            return *itr;
+    GuildMap::const_iterator itr = mGuildMap.find(GuildId);
+    if (itr != mGuildMap.end())
+        return itr->second;
 
     return NULL;
 }
 
 Guild * ObjectMgr::GetGuildByName(const std::string& guildname) const
 {
-    for(GuildSet::const_iterator itr = mGuildSet.begin(); itr != mGuildSet.end(); ++itr)
-        if ((*itr)->GetName() == guildname)
-            return *itr;
+    for(GuildMap::const_iterator itr = mGuildMap.begin(); itr != mGuildMap.end(); ++itr)
+        if (itr->second->GetName() == guildname)
+            return itr->second;
 
     return NULL;
 }
 
-std::string ObjectMgr::GetGuildNameById(const uint32 GuildId) const
+std::string ObjectMgr::GetGuildNameById(uint32 GuildId) const
 {
-    for(GuildSet::const_iterator itr = mGuildSet.begin(); itr != mGuildSet.end(); ++itr)
-        if ((*itr)->GetId() == GuildId)
-            return (*itr)->GetName();
+    GuildMap::const_iterator itr = mGuildMap.find(GuildId);
+    if (itr != mGuildMap.end())
+        return itr->second->GetName();
 
     return "";
 }
 
 Guild* ObjectMgr::GetGuildByLeader(const uint64 &guid) const
 {
-    for(GuildSet::const_iterator itr = mGuildSet.begin(); itr != mGuildSet.end(); ++itr)
-        if( (*itr)->GetLeader() == guid)
-            return *itr;
+    for(GuildMap::const_iterator itr = mGuildMap.begin(); itr != mGuildMap.end(); ++itr)
+        if (itr->second->GetLeader() == guid)
+            return itr->second;
 
     return NULL;
 }
 
-ArenaTeam* ObjectMgr::GetArenaTeamById(const uint32 arenateamid) const
+void ObjectMgr::AddGuild(Guild* guild)
+{
+    mGuildMap[guild->GetId()] = guild;
+}
+
+void ObjectMgr::RemoveGuild(uint32 Id)
+{
+    mGuildMap.erase(Id);
+}
+
+ArenaTeam* ObjectMgr::GetArenaTeamById(uint32 arenateamid) const
 {
     ArenaTeamMap::const_iterator itr = mArenaTeamMap.find(arenateamid);
     if (itr != mArenaTeamMap.end())
@@ -257,9 +254,9 @@ void ObjectMgr::AddArenaTeam(ArenaTeam* arenaTeam)
     mArenaTeamMap[arenaTeam->GetId()] = arenaTeam;
 }
 
-void ObjectMgr::RemoveArenaTeam(ArenaTeam* arenaTeam)
+void ObjectMgr::RemoveArenaTeam(uint32 Id)
 {
-    mArenaTeamMap.erase( arenaTeam->GetId() );
+    mArenaTeamMap.erase(Id);
 }
 
 CreatureInfo const* ObjectMgr::GetCreatureTemplate(uint32 id)
@@ -1679,6 +1676,12 @@ void ObjectMgr::LoadItemPrototypes()
         {
             sLog.outErrorDb("Item (Entry: %u) has wrong FoodType value (%u)",i,proto->FoodType);
             const_cast<ItemPrototype*>(proto)->FoodType = 0;
+        }
+
+        if(proto->ItemLimitCategory && !sItemLimitCategoryStore.LookupEntry(proto->ItemLimitCategory))
+        {
+            sLog.outErrorDb("Item (Entry: %u) has wrong LimitCategory value (%u)",i,proto->ItemLimitCategory);
+            const_cast<ItemPrototype*>(proto)->ItemLimitCategory = 0;
         }
     }
 }
@@ -4048,7 +4051,7 @@ void ObjectMgr::LoadInstanceTemplate()
         // entry->resetTimeHeroic store reset time for both heroic mode instance (raid and non-raid)
         // entry->resetTimeRaid   store reset time for normal raid only
         // for current state  entry->resetTimeRaid == entry->resetTimeHeroic in case raid instances with heroic mode.
-        // but at some point wee need implement reset time dependen from raid insatance mode
+        // but at some point wee need implement reset time dependent from raid instance mode
         if(temp->reset_delay == 0)
         {
             // use defaults from the DBC
@@ -4071,27 +4074,16 @@ void ObjectMgr::LoadInstanceTemplate()
     sLog.outString();
 }
 
-void ObjectMgr::AddGossipText(GossipText *pGText)
+GossipText const *ObjectMgr::GetGossipText(uint32 Text_ID) const
 {
-    ASSERT( pGText->Text_ID );
-    ASSERT( mGossipText.find(pGText->Text_ID) == mGossipText.end() );
-    mGossipText[pGText->Text_ID] = pGText;
-}
-
-GossipText *ObjectMgr::GetGossipText(uint32 Text_ID)
-{
-    GossipTextMap::const_iterator itr;
-    for (itr = mGossipText.begin(); itr != mGossipText.end(); ++itr)
-    {
-        if(itr->second->Text_ID == Text_ID)
-            return itr->second;
-    }
+    GossipTextMap::const_iterator itr = mGossipText.find(Text_ID);
+    if(itr != mGossipText.end())
+        return &itr->second;
     return NULL;
 }
 
 void ObjectMgr::LoadGossipText()
 {
-    GossipText *pGText;
     QueryResult *result = WorldDatabase.Query( "SELECT * FROM npc_text" );
 
     int count = 0;
@@ -4118,30 +4110,29 @@ void ObjectMgr::LoadGossipText()
 
         bar.step();
 
-        pGText = new GossipText;
-        pGText->Text_ID    = fields[cic++].GetUInt32();
+        uint32 Text_ID    = fields[cic++].GetUInt32();
+        if(!Text_ID)
+        {
+            sLog.outErrorDb("Table `npc_text` has record wit reserved id 0, ignore.");
+            continue;
+        }
+
+        GossipText& gText = mGossipText[Text_ID];
 
         for (int i=0; i< 8; i++)
         {
-            pGText->Options[i].Text_0           = fields[cic++].GetCppString();
-            pGText->Options[i].Text_1           = fields[cic++].GetCppString();
+            gText.Options[i].Text_0           = fields[cic++].GetCppString();
+            gText.Options[i].Text_1           = fields[cic++].GetCppString();
 
-            pGText->Options[i].Language         = fields[cic++].GetUInt32();
-            pGText->Options[i].Probability      = fields[cic++].GetFloat();
+            gText.Options[i].Language         = fields[cic++].GetUInt32();
+            gText.Options[i].Probability      = fields[cic++].GetFloat();
 
-            pGText->Options[i].Emotes[0]._Delay  = fields[cic++].GetUInt32();
-            pGText->Options[i].Emotes[0]._Emote  = fields[cic++].GetUInt32();
-
-            pGText->Options[i].Emotes[1]._Delay  = fields[cic++].GetUInt32();
-            pGText->Options[i].Emotes[1]._Emote  = fields[cic++].GetUInt32();
-
-            pGText->Options[i].Emotes[2]._Delay  = fields[cic++].GetUInt32();
-            pGText->Options[i].Emotes[2]._Emote  = fields[cic++].GetUInt32();
+            for(int j=0; j < 3; ++j)
+            {
+                gText.Options[i].Emotes[j]._Delay  = fields[cic++].GetUInt32();
+                gText.Options[i].Emotes[j]._Emote  = fields[cic++].GetUInt32();
+            }
         }
-
-        if ( !pGText->Text_ID ) continue;
-        AddGossipText( pGText );
-
     } while( result->NextRow() );
 
     sLog.outString();
@@ -6498,7 +6489,7 @@ bool PlayerCondition::Meets(Player const * player) const
         case CONDITION_ITEM:
             return player->HasItemCount(value1, value2);
         case CONDITION_ITEM_EQUIPPED:
-            return player->GetItemOrItemWithGemEquipped(value1) != NULL;
+            return player->HasItemOrGemWithIdEquipped(value1,1);
         case CONDITION_ZONEID:
             return player->GetZoneId() == value1;
         case CONDITION_REPUTATION_RANK:
@@ -6902,36 +6893,34 @@ void ObjectMgr::LoadTrainerSpell()
             continue;
         }
 
-        TrainerSpell* pTrainerSpell = new TrainerSpell();
-        pTrainerSpell->spell         = spell;
-        pTrainerSpell->spellCost     = fields[2].GetUInt32();
-        pTrainerSpell->reqSkill      = fields[3].GetUInt32();
-        pTrainerSpell->reqSkillValue = fields[4].GetUInt32();
-        pTrainerSpell->reqLevel      = fields[5].GetUInt32();
-
-        if(!pTrainerSpell->reqLevel)
-            pTrainerSpell->reqLevel = spellinfo->spellLevel;
-
-        // calculate learned spell for profession case when stored cast-spell
-        pTrainerSpell->learnedSpell = spell;
-        for(int i = 0; i <3; ++i)
-        {
-            if(spellinfo->Effect[i]!=SPELL_EFFECT_LEARN_SPELL)
-                continue;
-
-            if(SpellMgr::IsProfessionOrRidingSpell(spellinfo->EffectTriggerSpell[i]))
-            {
-                pTrainerSpell->learnedSpell = spellinfo->EffectTriggerSpell[i];
-                break;
-            }
-        }
-
         TrainerSpellData& data = m_mCacheTrainerSpellMap[entry];
 
         if(SpellMgr::IsProfessionSpell(spell))
             data.trainerType = 2;
 
-        data.spellList.push_back(pTrainerSpell);
+        TrainerSpell& trainerSpell = data.spellList[spell];
+        trainerSpell.spell         = spell;
+        trainerSpell.spellCost     = fields[2].GetUInt32();
+        trainerSpell.reqSkill      = fields[3].GetUInt32();
+        trainerSpell.reqSkillValue = fields[4].GetUInt32();
+        trainerSpell.reqLevel      = fields[5].GetUInt32();
+
+        if(!trainerSpell.reqLevel)
+            trainerSpell.reqLevel = spellinfo->spellLevel;
+
+        // calculate learned spell for profession case when stored cast-spell
+        trainerSpell.learnedSpell = spell;
+        for(int i = 0; i <3; ++i)
+        {
+            if(spellinfo->Effect[i] != SPELL_EFFECT_LEARN_SPELL)
+                continue;
+            if(SpellMgr::IsProfessionOrRidingSpell(spellinfo->EffectTriggerSpell[i]))
+            {
+                trainerSpell.learnedSpell = spellinfo->EffectTriggerSpell[i];
+                break;
+            }
+        }
+
         ++count;
 
     } while (result->NextRow());

@@ -1081,7 +1081,8 @@ class MANGOS_DLL_SPEC Player : public Unit
         bool HasItemCount( uint32 item, uint32 count, bool inBankAlso = false ) const;
         bool HasItemFitToSpellReqirements(SpellEntry const* spellInfo, Item const* ignoreItem = NULL);
         bool CanNoReagentCast(SpellEntry const* spellInfo) const;
-        Item* GetItemOrItemWithGemEquipped( uint32 item ) const;
+        bool HasItemOrGemWithIdEquipped( uint32 item, uint32 count, uint8 except_slot = NULL_SLOT) const;
+        bool HasItemOrGemWithLimitCategoryEquipped( uint32 limitCategory, uint32 count, uint8 except_slot = NULL_SLOT) const;
         uint8 CanTakeMoreSimilarItems(Item* pItem) const { return _CanTakeMoreSimilarItems(pItem->GetEntry(),pItem->GetCount(),pItem); }
         uint8 CanTakeMoreSimilarItems(uint32 entry, uint32 count) const { return _CanTakeMoreSimilarItems(entry,count,NULL); }
         uint8 CanStoreNewItem( uint8 bag, uint8 slot, ItemPosCountVec& dest, uint32 item, uint32 count, uint32* no_space_count = NULL ) const
@@ -1099,6 +1100,9 @@ class MANGOS_DLL_SPEC Player : public Unit
         uint8 CanStoreItems( Item **pItem,int count) const;
         uint8 CanEquipNewItem( uint8 slot, uint16 &dest, uint32 item, bool swap ) const;
         uint8 CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bool not_loading = true ) const;
+
+        uint8 CanEquipUniqueItem( Item * pItem, uint8 except_slot = NULL_SLOT, uint32 limit_count = 1 ) const;
+        uint8 CanEquipUniqueItem( ItemPrototype const* itemProto, uint8 except_slot = NULL_SLOT, uint32 limit_count = 1 ) const;
         uint8 CanUnequipItems( uint32 item, uint32 count ) const;
         uint8 CanUnequipItem( uint16 src, bool swap ) const;
         uint8 CanBankItem( uint8 bag, uint8 slot, ItemPosCountVec& dest, Item *pItem, bool swap, bool not_loading = true ) const;
@@ -1272,7 +1276,7 @@ class MANGOS_DLL_SPEC Player : public Unit
         void TalkedToCreature( uint32 entry, uint64 guid );
         void MoneyChanged( uint32 value );
         bool HasQuestForItem( uint32 itemid ) const;
-        bool HasQuestForGO(int32 GOId);
+        bool HasQuestForGO(int32 GOId) const;
         void UpdateForQuestsGO();
         bool CanShareQuest(uint32 quest_id) const;
 
@@ -1867,9 +1871,9 @@ class MANGOS_DLL_SPEC Player : public Unit
         BattleGround* GetBattleGround() const;
         bool InArena() const;
 
-        static uint32 GetMinLevelForBattleGroundQueueId(uint32 queue_id);
-        static uint32 GetMaxLevelForBattleGroundQueueId(uint32 queue_id);
-        uint32 GetBattleGroundQueueIdFromLevel() const;
+        static uint32 GetMinLevelForBattleGroundQueueId(uint32 queue_id, BattleGroundTypeId bgTypeId);
+        static uint32 GetMaxLevelForBattleGroundQueueId(uint32 queue_id, BattleGroundTypeId bgTypeId);
+        uint32 GetBattleGroundQueueIdFromLevel(BattleGroundTypeId bgTypeId) const;
 
         bool InBattleGroundQueue() const
         {

@@ -197,6 +197,7 @@ class ChatHandler
         bool HandleNpcUnFollowCommand(const char* args);
         bool HandleNpcWhisperCommand(const char* args);
         bool HandleNpcYellCommand(const char* args);
+        bool HandleNpcSetDeathStateCommand(const char* args);
 
         bool HandleReloadAllCommand(const char* args);
         bool HandleReloadAllAreaCommand(const char* args);
@@ -442,6 +443,7 @@ class ChatHandler
         bool HandleDebugBattlegroundCommand(const char * args);
         bool HandleSpawnVehicle(const char * args);
         bool HandleSendLargePacketCommand(const char * args);
+        bool HandleSendSetPhaseShiftCommand(const char * args);
 
         Player*   getSelectedPlayer();
         Creature* getSelectedCreature();
