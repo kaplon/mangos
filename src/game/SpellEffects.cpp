@@ -5751,7 +5751,11 @@ void Spell::EffectMomentMove(uint32 i)
         {
             fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,fz,true);
             if (fabs(fz-oz) > 4.0f)
-                return;
+            {
+                fx = ox;
+                fy = oy;
+                fz = oz;
+            }
         }  
         unitTarget->NearTeleportTo(fx, fy, fz, unitTarget->GetOrientation(),unitTarget==m_caster);
     }
