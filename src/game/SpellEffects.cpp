@@ -5729,19 +5729,6 @@ void Spell::EffectMomentMove(uint32 i)
     if(unitTarget->isInFlight())
         return;
 
-    float dis = GetSpellRadius(sSpellRadiusStore.LookupEntry(m_spellInfo->EffectRadiusIndex[i]));
-    float fx = m_caster->GetPositionX() + dis * cos(m_caster->GetOrientation());
-    float fy = m_caster->GetPositionY() + dis * sin(m_caster->GetOrientation());
-    // teleport a bit above terrain level to avoid falling below it
-    float fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,m_caster->GetPositionZ(),true);
-    if(fz <= INVALID_HEIGHT)                    // note: this also will prevent use effect in instances without vmaps height enabled
-        return;
-
-    float caster_pos_z = m_caster->GetPositionZ();
-    // Control the caster to not climb or drop when +-fz > 8
-    if(!(fz<=caster_pos_z+8 && fz>=caster_pos_z-8))
-        return;
-
     if( m_spellInfo->rangeIndex== 1)                        //self range
     {
         float dis = GetSpellRadius(sSpellRadiusStore.LookupEntry(m_spellInfo->EffectRadiusIndex[i]));
@@ -5758,9 +5745,14 @@ void Spell::EffectMomentMove(uint32 i)
             fx = fx2;
             fy = fy2;
             fz = fz2;
-            unitTarget->UpdateGroundPositionZ(fx,fy,fz);
         }
 
+        if(unitTarget->GetTypeId() == TYPEID_PLAYER)
+        {
+            fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,fz,true);
+            if (fabs(fz-oz) > 4.0f)
+                return;
+        }  
         unitTarget->NearTeleportTo(fx, fy, fz, unitTarget->GetOrientation(),unitTarget==m_caster);
     }
 }
