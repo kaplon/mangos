@@ -146,6 +146,7 @@ typedef UNORDERED_MAP<uint32,NpcTextLocale> NpcTextLocaleMap;
 typedef UNORDERED_MAP<uint32,PageTextLocale> PageTextLocaleMap;
 typedef UNORDERED_MAP<uint32,MangosStringLocale> MangosStringLocaleMap;
 typedef UNORDERED_MAP<uint32,NpcOptionLocale> NpcOptionLocaleMap;
+typedef UNORDERED_MAP<uint32,PointOfInterestLocale> PointOfInterestLocaleMap;
 
 typedef std::multimap<uint32,uint32> QuestRelations;
 
@@ -170,6 +171,17 @@ struct ReputationOnKillEntry
     uint32 reputation_max_cap2;
     int32 repvalue2;
     bool team_dependent;
+};
+
+struct PointOfInterest
+{
+    uint32 entry;
+    float x;
+    float y;
+    uint32 icon;
+    uint32 flags;
+    uint32 data;
+    std::string icon_name;
 };
 
 struct PetCreateSpellEntry
@@ -292,6 +304,7 @@ class ObjectMgr
         typedef UNORDERED_MAP<uint32, uint32> AreaTriggerScriptMap;
 
         typedef UNORDERED_MAP<uint32, ReputationOnKillEntry> RepOnKillMap;
+        typedef UNORDERED_MAP<uint32, PointOfInterest> PointOfInterestMap;
 
         typedef UNORDERED_MAP<uint32, WeatherZoneChances> WeatherZoneMap;
 
@@ -432,6 +445,14 @@ class ObjectMgr
             return NULL;
         }
 
+        PointOfInterest const* GetPointOfInterest(uint32 id) const
+        {
+            PointOfInterestMap::const_iterator itr = mPointsOfInterest.find(id);
+            if(itr != mPointsOfInterest.end())
+                return &itr->second;
+            return NULL;
+        }
+
         PetCreateSpellEntry const* GetPetCreateSpellEntry(uint32 id) const
         {
             PetCreateSpellMap::const_iterator itr = mPetCreateSpell.find(id);
@@ -487,6 +508,7 @@ class ObjectMgr
         void LoadNpcTextLocales();
         void LoadPageTextLocales();
         void LoadNpcOptionLocales();
+        void LoadPointOfInterestLocales();
         void LoadInstanceTemplate();
 
         void LoadGossipText();
@@ -509,6 +531,7 @@ class ObjectMgr
         void LoadFishingBaseSkillLevel();
 
         void LoadReputationOnKill();
+        void LoadPointsOfInterest();
 
         void LoadWeatherZoneChances();
         void LoadGameTele();
@@ -614,6 +637,12 @@ class ObjectMgr
         {
             NpcOptionLocaleMap::const_iterator itr = mNpcOptionLocaleMap.find(entry);
             if(itr==mNpcOptionLocaleMap.end()) return NULL;
+            return &itr->second;
+        }
+        PointOfInterestLocale const* GetPointOfInterestLocale(uint32 poi_id) const
+        {
+            PointOfInterestLocaleMap::const_iterator itr = mPointOfInterestLocaleMap.find(poi_id);
+            if(itr==mPointOfInterestLocaleMap.end()) return NULL;
             return &itr->second;
         }
 
@@ -769,6 +798,8 @@ class ObjectMgr
 
         RepOnKillMap        mRepOnKill;
 
+        PointOfInterestMap mPointsOfInterest;
+
         WeatherZoneMap      mWeatherZoneMap;
 
         PetCreateSpellMap   mPetCreateSpell;
@@ -827,6 +858,7 @@ class ObjectMgr
         PageTextLocaleMap mPageTextLocaleMap;
         MangosStringLocaleMap mMangosStringLocaleMap;
         NpcOptionLocaleMap mNpcOptionLocaleMap;
+        PointOfInterestLocaleMap mPointOfInterestLocaleMap;
         RespawnTimes mCreatureRespawnTimes;
         RespawnTimes mGORespawnTimes;
 
@@ -850,5 +882,7 @@ MANGOS_DLL_SPEC bool LoadMangosStrings(DatabaseType& db, char const* table,int32
 MANGOS_DLL_SPEC uint32 GetAreaTriggerScriptId(uint32 trigger_id);
 MANGOS_DLL_SPEC uint32 GetScriptId(const char *name);
 MANGOS_DLL_SPEC ObjectMgr::ScriptNameMap& GetScriptNames();
+MANGOS_DLL_SPEC CreatureInfo const* GetCreatureTemplateStore(uint32 entry);
+MANGOS_DLL_SPEC Quest const* GetQuestTemplateStore(uint32 entry);
 
 #endif

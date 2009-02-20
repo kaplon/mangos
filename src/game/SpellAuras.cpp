@@ -340,6 +340,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandleUnused,                                    //285 not used by any spells (3.08a)
     &Aura::HandleUnused,                                    //286 not used by any spells (3.08a)
     &Aura::HandleNoImmediateEffect,                         //287 SPELL_AURA_DEFLECT_SPELLS             implemented in Unit::MagicSpellHitResult and Unit::MeleeSpellHitResult
+    &Aura::HandleUnused,                                    //288 not used by any spells (3.09) except 1 test spell.
 };
 
 Aura::Aura(SpellEntry const* spellproto, uint32 eff, int32 *currentBasePoints, Unit *target, Unit *caster, Item* castItem) :
@@ -3844,7 +3845,7 @@ void Aura::HandleModMechanicImmunity(bool apply, bool Real)
     uint32 mechanic = 1 << m_modifier.m_miscvalue;
 
     //immune movement impairment and loss of control
-    if(GetId()==42292)
+    if(GetId()==42292 || GetId()==59752)
         mechanic=IMMUNE_TO_MOVEMENT_IMPAIRMENT_AND_LOSS_CONTROL_MASK;
 
     if(apply && GetSpellProto()->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY)
