@@ -4294,6 +4294,8 @@ void Spell::EffectWeaponDmg(uint32 i)
 
     // some spell specific modifiers
     bool customBonusDamagePercentMod = false;
+    bool spellBonusNeedWeaponDamagePercentMod = false;      // if set applied weapon damage percent mode to spell bonus
+
     float bonusDamagePercentMod  = 1.0f;                    // applied to fixed effect damage bonus if set customBonusDamagePercentMod
     float weaponDamagePercentMod = 1.0f;                    // applied to weapon damage (and to fixed effect damage bonus if customBonusDamagePercentMod not set
     float totalDamagePercentMod  = 1.0f;                    // applied to final bonus+weapon damage
@@ -4362,7 +4364,7 @@ void Spell::EffectWeaponDmg(uint32 i)
                 }
 
                 if(found)
-                    totalDamagePercentMod *= 1.5f;          // 150% if poisoned
+                    totalDamagePercentMod *= 1.2f;          // 120% if poisoned
             }
             break;
         }
@@ -4371,7 +4373,8 @@ void Spell::EffectWeaponDmg(uint32 i)
             // Seal of Command - receive benefit from Spell Damage and Healing
             if(m_spellInfo->SpellFamilyFlags & 0x00000002000000LL)
             {
-                spell_bonus += int32(0.20f*m_caster->SpellBaseDamageBonus(GetSpellSchoolMask(m_spellInfo)));
+                spellBonusNeedWeaponDamagePercentMod = true;// apply weaponDamagePercentMod to spell_bonus (and then to all bonus, fixes and weapon already have applied)
+                spell_bonus += int32(0.23f*m_caster->SpellBaseDamageBonus(GetSpellSchoolMask(m_spellInfo)));
                 spell_bonus += int32(0.29f*m_caster->SpellBaseDamageBonusForVictim(GetSpellSchoolMask(m_spellInfo), unitTarget));
             }
             break;
@@ -4422,6 +4425,10 @@ void Spell::EffectWeaponDmg(uint32 i)
                 break;                                      // not weapon damage effect, just skip
         }
     }
+
+    // apply weaponDamagePercentMod to spell bonus also
+    if(spellBonusNeedWeaponDamagePercentMod)
+        spell_bonus = int32(spell_bonus*weaponDamagePercentMod);
 
     // non-weapon damage
     int32 bonus = spell_bonus + fixed_bonus;

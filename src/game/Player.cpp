@@ -2376,6 +2376,8 @@ void Player::InitStatsForLevel(bool reapplyMods)
         UNIT_FLAG_SKINNABLE      | UNIT_FLAG_MOUNT        | UNIT_FLAG_TAXI_FLIGHT      );
     SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE );   // must be set
 
+    SetFlag(UNIT_FIELD_FLAGS_2,UNIT_FLAG2_REGENERATE_POWER);// must be set
+
     // cleanup player flags (will be re-applied if need at aura load), to avoid have ghost flag without ghost aura, for example.
     RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_AFK | PLAYER_FLAGS_DND | PLAYER_FLAGS_GM | PLAYER_FLAGS_GHOST);
 
@@ -10082,8 +10084,7 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
                     {
                         if( ItemPrototype const* pBagProto = pBag->GetProto() )
                         {
-                            if( pBagProto->Class==pProto->Class && pBagProto->SubClass==pProto->SubClass &&
-                                (!swap || pBag->GetSlot() != eslot ) )
+                            if( pBagProto->Class==pProto->Class && (!swap || pBag->GetSlot() != eslot ) )
                             {
                                 if(pBagProto->SubClass == ITEM_SUBCLASS_AMMO_POUCH)
                                     return EQUIP_ERR_CAN_EQUIP_ONLY1_AMMOPOUCH;
@@ -15744,8 +15745,7 @@ void Player::SaveToDB()
     uint32 tmp_displayid = GetDisplayId();
 
     // Set player sit state to standing on save, also stealth and shifted form
-    SetStandState(UNIT_STAND_STATE_STAND);                  // stand state
-    RemoveStandFlags(UNIT_STAND_FLAGS_ALL);                 // stand flags?
+    SetByteValue(UNIT_FIELD_BYTES_1, 0, UNIT_STAND_STATE_STAND);
     SetByteValue(UNIT_FIELD_BYTES_2, 3, 0);                 // shapeshift
     RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
     SetDisplayId(GetNativeDisplayId());
@@ -18628,34 +18628,20 @@ bool Player::GetBGAccessByLevel(BattleGroundTypeId bgTypeId) const
     return true;
 }
 
-uint32 Player::GetMinLevelForBattleGroundQueueId(uint32 queue_id, BattleGroundTypeId bgTypeId)
+BGQueueIdBasedOnLevel Player::GetBattleGroundQueueIdFromLevel(BattleGroundTypeId bgTypeId) const
 {
-    BattleGround *bg = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
-    assert(bg);
-    return (queue_id*10)+bg->GetMinLevel();
-}
+    //returned to hardcoded version of this function, because there is no way to code it dynamic
+    uint32 level = getLevel();
+    if( bgTypeId == BATTLEGROUND_QUEUE_AV )
+        level--;
 
-uint32 Player::GetMaxLevelForBattleGroundQueueId(uint32 queue_id, BattleGroundTypeId bgTypeId)
-{
-    return GetMinLevelForBattleGroundQueueId(queue_id, bgTypeId)+10;
-}
-
-uint32 Player::GetBattleGroundQueueIdFromLevel(BattleGroundTypeId bgTypeId) const
-{
-    BattleGround *bg = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
-    assert(bg);
-    if(getLevel()<bg->GetMinLevel())
+    uint32 queue_id = (level / 10) - 1; // for ranges 0 - 19, 20 - 29, 30 - 39, 40 - 49, 50 - 59, 60 - 69, 70 -79, 80
+    if( queue_id >= MAX_BATTLEGROUND_QUEUES )
     {
-        sLog.outError("getting queue_id for player who doesn't meet the requirements - this shouldn't happen");
-        return 0;
+        sLog.outError("BattleGround: too high queue_id %u this shouldn't happen", queue_id);
+        return QUEUE_ID_MAX_LEVEL_80;
     }
-    uint32 queue_id = (getLevel() - bg->GetMinLevel()) / 10;
-    if(queue_id>MAX_BATTLEGROUND_QUEUES)
-    {
-        sLog.outError("to high queue_id %u this shouldn't happen",queue_id);
-        return 0;
-    }
-    return queue_id;
+    return BGQueueIdBasedOnLevel(queue_id);
 }
 
 float Player::GetReputationPriceDiscount( Creature const* pCreature ) const

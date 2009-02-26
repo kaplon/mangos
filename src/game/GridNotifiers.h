@@ -114,7 +114,9 @@ namespace MaNGOS
         bool i_toSelf;
         bool i_ownTeamOnly;
         float i_dist;
-        MessageDistDeliverer(Player &pl, WorldPacket *msg, float dist, bool to_self, bool ownTeamOnly) : i_player(pl), i_message(msg), i_dist(dist), i_toSelf(to_self), i_ownTeamOnly(ownTeamOnly) {}
+
+        MessageDistDeliverer(Player &pl, WorldPacket *msg, float dist, bool to_self, bool ownTeamOnly)
+            : i_player(pl), i_message(msg), i_toSelf(to_self), i_ownTeamOnly(ownTeamOnly), i_dist(dist) {}
         void Visit(PlayerMapType &m);
         template<class SKIP> void Visit(GridRefManager<SKIP> &) {}
     };
@@ -479,6 +481,26 @@ namespace MaNGOS
         template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
     };
 
+    template<class Do>
+    struct MANGOS_DLL_DECL PlayerDistWorker
+    {
+        WorldObject const* i_searcher;
+        float i_dist;
+        Do& i_do;
+
+        PlayerDistWorker(WorldObject const* searcher, float _dist, Do& _do)
+            : i_searcher(searcher), i_dist(_dist), i_do(_do) {}
+
+        void Visit(PlayerMapType &m)
+        {
+            for(PlayerMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
+                if(itr->getSource()->InSamePhase(i_searcher) && itr->getSource()->GetDistance(i_searcher) <= i_dist)
+                    i_do(itr->getSource());
+        }
+
+        template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
+    };
+
     // CHECKS && DO classes
 
     // WorldObject check classes
@@ -818,6 +840,28 @@ namespace MaNGOS
         WorldObject const* i_obj;
         float i_range;
     };
+
+    // Player checks and do
+
+    // Prepare using Builder localized packets with caching and send to player
+    template<class Builder>
+    class LocalizedPacketDo
+    {
+        public:
+            explicit LocalizedPacketDo(Builder& builder) : i_builder(builder) {}
+
+            ~LocalizedPacketDo()
+            {
+                for(size_t i = 0; i < i_data_cache.size(); ++i)
+                    delete i_data_cache[i];
+            }
+            void operator()( Player* p );
+
+        private:
+            Builder& i_builder;
+            std::vector<WorldPacket*> i_data_cache;         // 0 = default, i => i-1 locale index
+    };
+
 
     #ifndef WIN32
     template<> void PlayerRelocationNotifier::Visit<Creature>(CreatureMapType &);

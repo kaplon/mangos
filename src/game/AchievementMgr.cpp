@@ -28,6 +28,9 @@
 #include "World.h"
 #include "SpellMgr.h"
 #include "ProgressBar.h"
+#include "GridNotifiersImpl.h"
+#include "CellImpl.h"
+#include "Language.h"
 
 #include "Policies/SingletonImp.h"
 
@@ -82,6 +85,37 @@ const CriteriaCastSpellRequirement AchievementGlobalMgr::m_criteriaCastSpellRequ
         {6321, 0, CLASS_HUNTER, RACE_DWARF},
         {6662, 31261, 0, 0}
     };
+
+
+namespace MaNGOS
+{
+    class AchievementChatBuilder
+    {
+        public:
+            AchievementChatBuilder(Player const& pl, ChatMsg msgtype, int32 textId, uint32 ach_id)
+                : i_player(pl), i_msgtype(msgtype), i_textId(textId), i_achievementId(ach_id) {}
+            void operator()(WorldPacket& data, int32 loc_idx)
+            {
+                char const* text = objmgr.GetMangosString(i_textId,loc_idx);
+
+                data << uint8(i_msgtype);
+                data << uint32(LANG_UNIVERSAL);
+                data << uint64(i_player.GetGUID());
+                data << uint32(5);
+                data << uint64(i_player.GetGUID());
+                data << uint32(strlen(text)+1);
+                data << text;
+                data << uint8(0);
+                data << uint32(i_achievementId);
+            }
+
+        private:
+            Player const& i_player;
+            ChatMsg i_msgtype;
+            int32 i_textId;
+            uint32 i_achievementId;
+    };
+}                                                           // namespace MaNGOS
 
 AchievementMgr::AchievementMgr(Player *player)
 {
@@ -259,7 +293,7 @@ void AchievementMgr::LoadFromDB(QueryResult *achievementResult, QueryResult *cri
             time_t date    = time_t(fields[2].GetUInt64());
 
             AchievementCriteriaEntry const* criteria = sAchievementCriteriaStore.LookupEntry(id);
-            if(!criteria || criteria->timeLimit && date + criteria->timeLimit < time(NULL))
+            if (!criteria || (criteria->timeLimit && time_t(date + criteria->timeLimit) < time(NULL)))
                 continue;
 
             CriteriaProgress& progress = m_criteriaProgress[id];
@@ -276,20 +310,11 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement)
 {
     sLog.outDebug("AchievementMgr::SendAchievementEarned(%u)", achievement->ID);
 
-    const char *msg = "|Hplayer:$N|h[$N]|h has earned the achievement $a!";
     if(Guild* guild = objmgr.GetGuildById(GetPlayer()->GetGuildId()))
     {
-        WorldPacket data(SMSG_MESSAGECHAT, 200);
-        data << uint8(CHAT_MSG_GUILD_ACHIEVEMENT);
-        data << uint32(LANG_UNIVERSAL);
-        data << uint64(GetPlayer()->GetGUID());
-        data << uint32(5);
-        data << uint64(GetPlayer()->GetGUID());
-        data << uint32(strlen(msg)+1);
-        data << msg;
-        data << uint8(0);
-        data << uint32(achievement->ID);
-        guild->BroadcastPacket(&data);
+        MaNGOS::AchievementChatBuilder say_builder(*GetPlayer(), CHAT_MSG_GUILD_ACHIEVEMENT, LANG_ACHIEVEMENT_EARNED,achievement->ID);
+        MaNGOS::LocalizedPacketDo<MaNGOS::AchievementChatBuilder> say_do(say_builder);
+        guild->BroadcastWorker(say_do,GetPlayer());
     }
     if(achievement->flags & (ACHIEVEMENT_FLAG_REALM_FIRST_KILL|ACHIEVEMENT_FLAG_REALM_FIRST_REACH))
     {
@@ -298,23 +323,23 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement)
         data << GetPlayer()->GetName();
         data << uint64(GetPlayer()->GetGUID());
         data << uint32(achievement->ID);
-        data << uint32(0);  // 1=link supplied string as player name, 0=display plain string
+        data << uint32(0);                                  // 1=link supplied string as player name, 0=display plain string
         sWorld.SendGlobalMessage(&data);
     }
     else
     {
-        WorldPacket data(SMSG_MESSAGECHAT, 200);
-        data << uint8(CHAT_MSG_ACHIEVEMENT);
-        data << uint32(LANG_UNIVERSAL);
-        data << uint64(GetPlayer()->GetGUID());
-        data << uint32(5);
-        data << uint64(GetPlayer()->GetGUID());
-        data << uint32(strlen(msg)+1);
-        data << msg;
-        data << uint8(0);
-        data << uint32(achievement->ID);
-        GetPlayer()->SendMessageToSet(&data, true);
+        CellPair p = MaNGOS::ComputeCellPair(GetPlayer()->GetPositionX(), GetPlayer()->GetPositionY());
 
+        Cell cell(p);
+        cell.data.Part.reserved = ALL_DISTRICT;
+        cell.SetNoCreate();
+
+        MaNGOS::AchievementChatBuilder say_builder(*GetPlayer(), CHAT_MSG_GUILD_ACHIEVEMENT, LANG_ACHIEVEMENT_EARNED,achievement->ID);
+        MaNGOS::LocalizedPacketDo<MaNGOS::AchievementChatBuilder> say_do(say_builder);
+        MaNGOS::PlayerDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::AchievementChatBuilder> > say_worker(GetPlayer(),sWorld.getConfig(CONFIG_LISTEN_RANGE_SAY),say_do);
+        TypeContainerVisitor<MaNGOS::PlayerDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::AchievementChatBuilder> >, WorldTypeMapContainer > message(say_worker);
+        CellLock<GridReadGuard> cell_lock(cell, p);
+        cell_lock->Visit(cell_lock, message, *GetPlayer()->GetMap());
     }
     WorldPacket data(SMSG_ACHIEVEMENT_EARNED, 8+4+8);
     data.append(GetPlayer()->GetPackGUID());
@@ -376,8 +401,8 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
         if(!achievement)
             continue;
 
-        if(achievement->factionFlag == ACHIEVEMENT_FACTION_FLAG_HORDE && GetPlayer()->GetTeam() != HORDE ||
-            achievement->factionFlag == ACHIEVEMENT_FACTION_FLAG_ALLIANCE && GetPlayer()->GetTeam() != ALLIANCE)
+        if ((achievement->factionFlag == ACHIEVEMENT_FACTION_FLAG_HORDE    && GetPlayer()->GetTeam() != HORDE) ||
+            (achievement->factionFlag == ACHIEVEMENT_FACTION_FLAG_ALLIANCE && GetPlayer()->GetTeam() != ALLIANCE))
             continue;
 
         switch (type)
@@ -415,7 +440,7 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
                 for(QuestStatusMap::iterator itr = GetPlayer()->getQuestStatusMap().begin(); itr!=GetPlayer()->getQuestStatusMap().end(); itr++)
                 {
                     Quest const* quest = objmgr.GetQuestTemplate(itr->first);
-                    if(itr->second.m_rewarded && quest->GetZoneOrSort() == achievementCriteria->complete_quests_in_zone.zoneID)
+                    if(itr->second.m_rewarded && quest->GetZoneOrSort() >= 0 && uint32(quest->GetZoneOrSort()) == achievementCriteria->complete_quests_in_zone.zoneID)
                         counter++;
                 }
                 SetCriteriaProgress(achievementCriteria, counter);
@@ -548,11 +573,11 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
                 uint32 spellCount = 0;
                 for (PlayerSpellMap::const_iterator spellIter = GetPlayer()->GetSpellMap().begin();
                         spellIter != GetPlayer()->GetSpellMap().end();
-                        spellIter++)
+                        ++spellIter)
                 {
                     for(SkillLineAbilityMap::const_iterator skillIter = spellmgr.GetBeginSkillLineAbilityMap(spellIter->first);
                             skillIter != spellmgr.GetEndSkillLineAbilityMap(spellIter->first);
-                            skillIter++)
+                            ++skillIter)
                     {
                         if(skillIter->second->skillId == achievementCriteria->learn_skilline_spell.skillLine)
                             spellCount++;
@@ -580,7 +605,7 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
             {
                 uint32 counter = 0;
                 const FactionStateList factionStateList = GetPlayer()->GetFactionStateList();
-                for (FactionStateList::const_iterator iter = factionStateList.begin(); iter!= factionStateList.end(); iter++)
+                for (FactionStateList::const_iterator iter = factionStateList.begin(); iter!= factionStateList.end(); ++iter)
                 {
                     if(GetPlayer()->ReputationToRank(iter->second.Standing) >= REP_EXALTED)
                         ++counter;
@@ -625,6 +650,77 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
                SetCriteriaProgress(achievementCriteria, 1, true);
                break;
            }
+           case ACHIEVEMENT_CRITERIA_TYPE_WIN_BG:
+           case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_DAILY_QUEST_DAILY:
+           case ACHIEVEMENT_CRITERIA_TYPE_DAMAGE_DONE:
+           case ACHIEVEMENT_CRITERIA_TYPE_DEATH:
+           case ACHIEVEMENT_CRITERIA_TYPE_DEATH_IN_DUNGEON:
+           case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_RAID:
+           case ACHIEVEMENT_CRITERIA_TYPE_DEATHS_FROM:
+           case ACHIEVEMENT_CRITERIA_TYPE_BG_OBJECTIVE_CAPTURE:
+           case ACHIEVEMENT_CRITERIA_TYPE_HONORABLE_KILL_AT_AREA:
+           case ACHIEVEMENT_CRITERIA_TYPE_WIN_ARENA:
+           case ACHIEVEMENT_CRITERIA_TYPE_PLAY_ARENA:
+           case ACHIEVEMENT_CRITERIA_TYPE_HONORABLE_KILL:
+           case ACHIEVEMENT_CRITERIA_TYPE_WIN_RATED_ARENA:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_TEAM_RATING:
+           case ACHIEVEMENT_CRITERIA_TYPE_REACH_TEAM_RATING:
+           case ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LEVEL:
+           case ACHIEVEMENT_CRITERIA_TYPE_OWN_RANK:
+           case ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM:
+           case ACHIEVEMENT_CRITERIA_TYPE_HK_CLASS:
+           case ACHIEVEMENT_CRITERIA_TYPE_HK_RACE:
+           case ACHIEVEMENT_CRITERIA_TYPE_DO_EMOTE:
+           case ACHIEVEMENT_CRITERIA_TYPE_HEALING_DONE:
+           case ACHIEVEMENT_CRITERIA_TYPE_GET_KILLING_BLOWS:
+           case ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM:
+           case ACHIEVEMENT_CRITERIA_TYPE_MONEY_FROM_VENDORS:
+           case ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TALENTS:
+           case ACHIEVEMENT_CRITERIA_TYPE_NUMBER_OF_TALENT_RESETS:
+           case ACHIEVEMENT_CRITERIA_TYPE_MONEY_FROM_QUEST_REWARD:
+           case ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TRAVELLING:
+           case ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_AT_BARBER:
+           case ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_MAIL:
+           case ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY:
+           case ACHIEVEMENT_CRITERIA_TYPE_USE_GAMEOBJECT:
+           case ACHIEVEMENT_CRITERIA_TYPE_SPECIAL_PVP_KILL:
+           case ACHIEVEMENT_CRITERIA_TYPE_FISH_IN_GAMEOBJECT:
+           case ACHIEVEMENT_CRITERIA_TYPE_EARNED_PVP_TITLE:
+           case ACHIEVEMENT_CRITERIA_TYPE_LOSE_DUEL:
+           case ACHIEVEMENT_CRITERIA_TYPE_KILL_CREATURE_TYPE:
+           case ACHIEVEMENT_CRITERIA_TYPE_GOLD_EARNED_BY_AUCTIONS:
+           case ACHIEVEMENT_CRITERIA_TYPE_CREATE_AUCTION:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_AUCTION_BID:
+           case ACHIEVEMENT_CRITERIA_TYPE_WON_AUCTIONS:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_AUCTION_SOLD:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_GOLD_VALUE_OWNED:
+           case ACHIEVEMENT_CRITERIA_TYPE_GAIN_REVERED_REPUTATION:
+           case ACHIEVEMENT_CRITERIA_TYPE_GAIN_HONORED_REPUTATION:
+           case ACHIEVEMENT_CRITERIA_TYPE_KNOWN_FACTIONS:
+           case ACHIEVEMENT_CRITERIA_TYPE_LOOT_EPIC_ITEM:
+           case ACHIEVEMENT_CRITERIA_TYPE_RECEIVE_EPIC_ITEM:
+           case ACHIEVEMENT_CRITERIA_TYPE_ROLL_NEED:
+           case ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_HEALTH:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_POWER:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_STAT:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_SPELLPOWER:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_ARMOR:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_RATING:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_HIT_DEALT:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_HIT_RECEIVED:
+           case ACHIEVEMENT_CRITERIA_TYPE_TOTAL_DAMAGE_RECEIVED:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_HEAL_CASTED:
+           case ACHIEVEMENT_CRITERIA_TYPE_TOTAL_HEALING_RECEIVED:
+           case ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_HEALING_RECEIVED:
+           case ACHIEVEMENT_CRITERIA_TYPE_QUEST_ABANDONED:
+           case ACHIEVEMENT_CRITERIA_TYPE_FLIGHT_PATHS_TAKEN:
+           case ACHIEVEMENT_CRITERIA_TYPE_LOOT_TYPE:
+           case ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LINE:
+           case ACHIEVEMENT_CRITERIA_TYPE_EARN_HONORABLE_KILL:
+           case ACHIEVEMENT_CRITERIA_TYPE_ACCEPTED_SUMMONINGS:
+           case ACHIEVEMENT_CRITERIA_TYPE_TOTAL:
+               break;                                   // Not implemented yet :(
         }
         if(IsCompletedCriteria(achievementCriteria))
             CompletedCriteria(achievementCriteria);
@@ -657,27 +753,27 @@ bool AchievementMgr::IsCompletedCriteria(AchievementCriteriaEntry const* achieve
     switch(achievementCriteria->requiredType)
     {
         case ACHIEVEMENT_CRITERIA_TYPE_REACH_LEVEL:
-            if(achievement->ID == 467 && GetPlayer()->getClass() != CLASS_SHAMAN ||
-                    achievement->ID == 466 && GetPlayer()->getClass() != CLASS_DRUID ||
-                    achievement->ID == 465 && GetPlayer()->getClass() != CLASS_PALADIN ||
-                    achievement->ID == 464 && GetPlayer()->getClass() != CLASS_PRIEST ||
-                    achievement->ID == 463 && GetPlayer()->getClass() != CLASS_WARLOCK ||
-                    achievement->ID == 462 && GetPlayer()->getClass() != CLASS_HUNTER ||
-                    achievement->ID == 461 && GetPlayer()->getClass() != CLASS_DEATH_KNIGHT ||
-                    achievement->ID == 460 && GetPlayer()->getClass() != CLASS_MAGE ||
-                    achievement->ID == 459 && GetPlayer()->getClass() != CLASS_WARRIOR ||
-                    achievement->ID == 458 && GetPlayer()->getClass() != CLASS_ROGUE ||
+            if ((achievement->ID == 467 && GetPlayer()->getClass() != CLASS_SHAMAN     ) ||
+                (achievement->ID == 466 && GetPlayer()->getClass() != CLASS_DRUID      ) ||
+                (achievement->ID == 465 && GetPlayer()->getClass() != CLASS_PALADIN    ) ||
+                (achievement->ID == 464 && GetPlayer()->getClass() != CLASS_PRIEST     ) ||
+                (achievement->ID == 463 && GetPlayer()->getClass() != CLASS_WARLOCK    ) ||
+                (achievement->ID == 462 && GetPlayer()->getClass() != CLASS_HUNTER     ) ||
+                (achievement->ID == 461 && GetPlayer()->getClass() != CLASS_DEATH_KNIGHT)||
+                (achievement->ID == 460 && GetPlayer()->getClass() != CLASS_MAGE       ) ||
+                (achievement->ID == 459 && GetPlayer()->getClass() != CLASS_WARRIOR    ) ||
+                (achievement->ID == 458 && GetPlayer()->getClass() != CLASS_ROGUE      ) ||
 
-                    achievement->ID == 1404 && GetPlayer()->getRace() != RACE_GNOME ||
-                    achievement->ID == 1405 && GetPlayer()->getRace() != RACE_BLOODELF ||
-                    achievement->ID == 1406 && GetPlayer()->getRace() != RACE_DRAENEI ||
-                    achievement->ID == 1407 && GetPlayer()->getRace() != RACE_DWARF ||
-                    achievement->ID == 1408 && GetPlayer()->getRace() != RACE_HUMAN ||
-                    achievement->ID == 1409 && GetPlayer()->getRace() != RACE_NIGHTELF ||
-                    achievement->ID == 1410 && GetPlayer()->getRace() != RACE_ORC ||
-                    achievement->ID == 1411 && GetPlayer()->getRace() != RACE_TAUREN ||
-                    achievement->ID == 1412 && GetPlayer()->getRace() != RACE_TROLL ||
-                    achievement->ID == 1413 && GetPlayer()->getRace() != RACE_UNDEAD_PLAYER )
+                (achievement->ID == 1404 && GetPlayer()->getRace() != RACE_GNOME       ) ||
+                (achievement->ID == 1405 && GetPlayer()->getRace() != RACE_BLOODELF    ) ||
+                (achievement->ID == 1406 && GetPlayer()->getRace() != RACE_DRAENEI     ) ||
+                (achievement->ID == 1407 && GetPlayer()->getRace() != RACE_DWARF       ) ||
+                (achievement->ID == 1408 && GetPlayer()->getRace() != RACE_HUMAN       ) ||
+                (achievement->ID == 1409 && GetPlayer()->getRace() != RACE_NIGHTELF    ) ||
+                (achievement->ID == 1410 && GetPlayer()->getRace() != RACE_ORC         ) ||
+                (achievement->ID == 1411 && GetPlayer()->getRace() != RACE_TAUREN      ) ||
+                (achievement->ID == 1412 && GetPlayer()->getRace() != RACE_TROLL       ) ||
+                (achievement->ID == 1413 && GetPlayer()->getRace() != RACE_UNDEAD_PLAYER) )
                 return false;
             return progress->counter >= achievementCriteria->reach_level.level;
         case ACHIEVEMENT_CRITERIA_TYPE_BUY_BANK_SLOT:
@@ -812,10 +908,9 @@ void AchievementMgr::SetCriteriaProgress(AchievementCriteriaEntry const* entry, 
     if(entry->timeLimit)
     {
         time_t now = time(NULL);
-        if(progress->date + entry->timeLimit < now)
-        {
+        if(time_t(progress->date + entry->timeLimit) < now)
             progress->counter = 1;
-        }
+
         // also it seems illogical, the timeframe will be extended at every criteria update
         progress->date = now;
     }
@@ -947,7 +1042,7 @@ void AchievementGlobalMgr::LoadAchievementCriteriaList()
         barGoLink bar(1);
         bar.step();
 
-        sLog.outString("");
+        sLog.outString();
         sLog.outErrorDb(">> Loaded 0 achievement criteria.");
         return;
     }
@@ -978,7 +1073,7 @@ void AchievementGlobalMgr::LoadCompletedAchievements()
         barGoLink bar(1);
         bar.step();
 
-        sLog.outString("");
+        sLog.outString();
         sLog.outString(">> Loaded 0 realm completed achievements . DB table `character_achievement` is empty.");
         return;
     }
@@ -993,7 +1088,7 @@ void AchievementGlobalMgr::LoadCompletedAchievements()
 
     delete result;
 
-    sLog.outString("");
+    sLog.outString();
     sLog.outString(">> Loaded %u realm completed achievements.",m_allCompletedAchievements.size());
 }
 
@@ -1010,7 +1105,7 @@ void AchievementGlobalMgr::LoadRewards()
 
         bar.step();
 
-        sLog.outString("");
+        sLog.outString();
         sLog.outErrorDb(">> Loaded 0 achievement rewards. DB table `achievement_reward` is empty.");
         return;
     }
@@ -1119,7 +1214,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
 
         bar.step();
 
-        sLog.outString("");
+        sLog.outString();
         sLog.outString(">> Loaded 0 achievement reward locale strings. DB table `locales_achievement_reward` is empty.");
         return;
     }
@@ -1149,7 +1244,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
                 int idx = objmgr.GetOrNewIndexForLocale(LocaleConstant(i));
                 if(idx >= 0)
                 {
-                    if(data.subject.size() <= idx)
+                    if(data.subject.size() <= size_t(idx))
                         data.subject.resize(idx+1);
 
                     data.subject[idx] = str;
@@ -1161,7 +1256,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
                 int idx = objmgr.GetOrNewIndexForLocale(LocaleConstant(i));
                 if(idx >= 0)
                 {
-                    if(data.text.size() <= idx)
+                    if(data.text.size() <= size_t(idx))
                         data.text.resize(idx+1);
 
                     data.text[idx] = str;

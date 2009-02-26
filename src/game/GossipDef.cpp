@@ -198,7 +198,7 @@ void PlayerMenu::SendPointOfInterest( uint32 poi_id )
     PointOfInterest const* poi = objmgr.GetPointOfInterest(poi_id);
     if(!poi)
     {
-        sLog.outErrorDb("Requested send not existed POI (Id: %u), ignore.");
+        sLog.outErrorDb("Requested send not existed POI (Id: %u), ignore.",poi_id);
         return;
     }
 
@@ -622,7 +622,7 @@ void PlayerMenu::SendQuestQueryResponse( Quest const *pQuest )
             data << uint32(pQuest->ReqCreatureOrGOId[iI]);
         }
         data << uint32(pQuest->ReqCreatureOrGOCount[iI]);
-        data << uint32(0);                                  // added in WotLK, dunno if offset if correct
+        data << uint32(pQuest->ReqSourceId[iI]);
     }
 
     for (iI = 0; iI < QUEST_OBJECTIVES_COUNT; ++iI)

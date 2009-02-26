@@ -878,6 +878,7 @@ void GameObject::Use(Unit* user)
     // by default spell caster is user
     Unit* spellCaster = user;
     uint32 spellId = 0;
+    bool triggered = false;
 
     switch(GetGoType())
     {
@@ -1121,6 +1122,13 @@ void GameObject::Use(Unit* user)
                 return;
 
             spellId = info->summoningRitual.spellId;
+            if(spellId==62330)                              // GO store not existed spell, replace by expected
+            {
+                // spell have reagent and mana cost but it not expected use its
+                // it triggered spell in fact casted at currently channeled GO
+                spellId = 61993;
+                triggered = true;
+            }
 
             // finish spell
             caster->m_currentSpells[CURRENT_CHANNELED_SPELL]->SendChannelUpdate(0);
@@ -1178,7 +1186,10 @@ void GameObject::Use(Unit* user)
             if (level < info->meetingstone.minLevel || level > info->meetingstone.maxLevel)
                 return;
 
-            spellId = 23598;
+            if(info->id==194097)
+                spellId = 61994;                            // Ritual of Summoning
+            else
+                spellId = 59782;                            // Summoning Stone Effect
 
             break;
         }
@@ -1291,7 +1302,7 @@ void GameObject::Use(Unit* user)
         return;
     }
 
-    Spell *spell = new Spell(spellCaster, spellInfo, false);
+    Spell *spell = new Spell(spellCaster, spellInfo, triggered);
 
     // spell target is user of GO
     SpellCastTargets targets;
