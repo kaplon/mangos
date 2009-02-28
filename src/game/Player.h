@@ -1200,6 +1200,8 @@ class MANGOS_DLL_SPEC Player : public Unit
         /***                    QUEST SYSTEM                   ***/
         /*********************************************************/
 
+        uint32 GetQuestLevel( Quest const* pQuest ) const { return pQuest && pQuest->GetQuestLevel() ? pQuest->GetQuestLevel() : getLevel(); }
+
         void PrepareQuestMenu( uint64 guid );
         void SendPreparedQuest( uint64 guid );
         bool IsActiveQuest( uint32 quest_id ) const;
@@ -1866,9 +1868,10 @@ class MANGOS_DLL_SPEC Player : public Unit
         /***               BATTLEGROUND SYSTEM                 ***/
         /*********************************************************/
 
-        bool InBattleGround()       const   { return m_bgBattleGroundID != 0; }
-        bool InArena() const;
-        uint32 GetBattleGroundId()  const   { return m_bgBattleGroundID; }
+        bool InBattleGround()       const                { return m_bgBattleGroundID != 0; }
+        bool InArena()              const;
+        uint32 GetBattleGroundId()  const                { return m_bgBattleGroundID; }
+        BattleGroundTypeId GetBattleGroundTypeId() const { return m_bgTypeID; }
         BattleGround* GetBattleGround() const;
 
 
@@ -1902,7 +1905,11 @@ class MANGOS_DLL_SPEC Player : public Unit
             return GetBattleGroundQueueIndex(bgQueueTypeId) < PLAYER_MAX_BATTLEGROUND_QUEUES;
         }
 
-        void SetBattleGroundId(uint32 val)  { m_bgBattleGroundID = val; }
+        void SetBattleGroundId(uint32 val, BattleGroundTypeId bgTypeId)
+        {
+            m_bgBattleGroundID = val;
+            m_bgTypeID = bgTypeId;
+        }
         uint32 AddBattleGroundQueueId(BattleGroundQueueTypeId val)
         {
             for (int i=0; i < PLAYER_MAX_BATTLEGROUND_QUEUES; i++)
@@ -2159,6 +2166,7 @@ class MANGOS_DLL_SPEC Player : public Unit
 
         /* this variable is set to bg->m_InstanceID, when player is teleported to BG - (it is battleground's GUID)*/
         uint32 m_bgBattleGroundID;
+        BattleGroundTypeId m_bgTypeID;
         /*
         this is an array of BG queues (BgTypeIDs) in which is player
         */
