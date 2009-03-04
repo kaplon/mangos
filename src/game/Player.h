@@ -51,6 +51,7 @@ class SpellCastTargets;
 class PlayerSocial;
 class AchievementMgr;
 class Vehicle;
+class OutdoorPvP;
 
 typedef std::deque<Mail*> PlayerMails;
 
@@ -1852,7 +1853,7 @@ class MANGOS_DLL_SPEC Player : public Unit
         void CastItemCombatSpell(Item *item,Unit* Target, WeaponAttackType attType);
         void CastItemUseSpell(Item *item,SpellCastTargets const& targets,uint8 cast_count, uint32 glyphIndex);
 
-        void SendInitWorldStates();
+        void SendInitWorldStates(bool force = false, uint32 forceZoneId = 0);
         void SendUpdateWorldState(uint32 Field, uint32 Value);
         void SendDirectMessage(WorldPacket *data);
 
@@ -1974,6 +1975,14 @@ class MANGOS_DLL_SPEC Player : public Unit
 
         bool GetBGAccessByLevel(BattleGroundTypeId bgTypeId) const;
         bool isAllowUseBattleGroundObject();
+
+        /*********************************************************/
+        /***               OUTDOOR PVP SYSTEM                  ***/
+        /*********************************************************/
+
+        OutdoorPvP * GetOutdoorPvP() const;
+        // returns true if the player is in active state for outdoor pvp objective capturing, false otherwise
+        bool IsOutdoorPvPActive();
 
         /*********************************************************/
         /***                    REST SYSTEM                    ***/

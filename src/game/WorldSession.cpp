@@ -36,7 +36,8 @@
 #include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "BattleGroundMgr.h"
-#include "Language.h"                                       // for CMSG_CANCEL_MOUNT_AURA handler
+#include "OutdoorPvPMgr.h"
+#include "Language.h"                                       // for CMSG_DISMOUNT handler
 #include "Chat.h"
 #include "SocialMgr.h"
 
@@ -305,6 +306,9 @@ void WorldSession::LogoutPlayer(bool Save)
         //drop a flag if player is carrying it
         if(BattleGround *bg = _player->GetBattleGround())
             bg->EventPlayerDroppedFlag(_player);
+
+        ///- Remove from OutdoorPvP
+        sOutdoorPvPMgr.HandlePlayerLeaveZone(_player,_player->GetZoneId());
 
         ///- Teleport to home if the player is in an invalid instance
         if(!_player->m_InstanceValid && !_player->isGameMaster())
