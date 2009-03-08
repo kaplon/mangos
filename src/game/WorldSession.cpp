@@ -20,12 +20,11 @@
     \ingroup u2w
 */
 
-#include "WorldSocket.h"
+#include "WorldSocket.h"                                    // must be first to make ACE happy with ACE includes in it
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
 #include "Opcodes.h"
-#include "WorldSocket.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "Player.h"
@@ -33,7 +32,6 @@
 #include "Group.h"
 #include "Guild.h"
 #include "World.h"
-#include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "BattleGroundMgr.h"
 #include "OutdoorPvPMgr.h"
@@ -305,7 +303,7 @@ void WorldSession::LogoutPlayer(bool Save)
         }
         //drop a flag if player is carrying it
         if(BattleGround *bg = _player->GetBattleGround())
-            bg->EventPlayerDroppedFlag(_player);
+            bg->EventPlayerLoggedOut(_player);
 
         ///- Remove from OutdoorPvP
         sOutdoorPvPMgr.HandlePlayerLeaveZone(_player,_player->GetZoneId());

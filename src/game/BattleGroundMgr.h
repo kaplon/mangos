@@ -174,7 +174,7 @@ class BattleGroundMgr
 
         /* Packet Building */
         void BuildPlayerJoinedBattleGroundPacket(WorldPacket *data, Player *plr);
-        void BuildPlayerLeftBattleGroundPacket(WorldPacket *data, Player *plr);
+        void BuildPlayerLeftBattleGroundPacket(WorldPacket *data, const uint64& guid);
         void BuildBattleGroundListPacket(WorldPacket *data, const uint64& guid, Player *plr, BattleGroundTypeId bgTypeId);
         void BuildGroupJoinedBattlegroundPacket(WorldPacket *data, BattleGroundTypeId bgTypeId);
         void BuildUpdateWorldStatePacket(WorldPacket *data, uint32 field, uint32 value);
@@ -199,7 +199,7 @@ class BattleGroundMgr
         void RemoveBattleGround(uint32 instanceID, BattleGroundTypeId bgTypeId) { m_BattleGrounds[bgTypeId].erase(instanceID); }
 
         void CreateInitialBattleGrounds();
-        void DeleteAlllBattleGrounds();
+        void DeleteAllBattleGrounds();
 
         void SendToBattleGround(Player *pl, uint32 InstanceID, BattleGroundTypeId bgTypeId);
 

@@ -21,13 +21,13 @@
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
 #include "Opcodes.h"
-#include "ObjectMgr.h"
 #include "SpellMgr.h"
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "UpdateMask.h"
 #include "Player.h"
+#include "Vehicle.h"
 #include "SkillDiscovery.h"
 #include "QuestDef.h"
 #include "GossipDef.h"
@@ -47,7 +47,6 @@
 #include "Group.h"
 #include "Guild.h"
 #include "Pet.h"
-#include "SpellAuras.h"
 #include "Util.h"
 #include "Transports.h"
 #include "Weather.h"
@@ -14454,7 +14453,7 @@ bool Player::LoadFromDB( uint32 guid, SqlQueryHolder *holder )
             SetBGTeam(bgteam);
 
             //join player to battleground group
-            currentBg->PlayerRelogin(this);
+            currentBg->EventPlayerLoggedIn(this, GetGUID());
             currentBg->AddOrSetPlayerToCorrectBgGroup(this, GetGUID(), bgteam);
 
             SetInviteForBattleGroundQueueType(bgQueueTypeId,currentBg->GetInstanceID());

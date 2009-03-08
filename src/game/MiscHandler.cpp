@@ -34,14 +34,13 @@
 #include "Chat.h"
 #include "ScriptCalls.h"
 #include <zlib/zlib.h>
-#include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "Object.h"
 #include "BattleGround.h"
-#include "OutdoorPvP.h"
 #include "SpellAuras.h"
 #include "Pet.h"
 #include "SocialMgr.h"
+#include "OutdoorPvP.h"
 
 void WorldSession::HandleRepopRequestOpcode( WorldPacket & /*recv_data*/ )
 {
