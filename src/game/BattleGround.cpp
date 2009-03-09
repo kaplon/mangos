@@ -240,6 +240,7 @@ void BattleGround::Update(uint32 diff)
             {
                 RemovePlayerAtLeave(itr->first, true, true);// remove player from BG
                 m_OfflineQueue.pop_front();                 // remove from offline queue
+                //do not use itr for anything, because it is erased in RemovePlayerAtLeave()
             }
         }
     }
@@ -422,9 +423,15 @@ void BattleGround::Update(uint32 diff)
         m_EndTime += diff;
         if(m_EndTime >= TIME_TO_AUTOREMOVE)                 // 2 minutes
         {
-            for(BattleGroundPlayerMap::iterator itr = m_Players.begin(); itr != m_Players.end(); ++itr)
+            BattleGroundPlayerMap::iterator itr, next;
+            for(itr = m_Players.begin(); itr != m_Players.end(); itr = next)
+            {
+                next = itr;
+                ++next;
+                //itr is erased here!
                 RemovePlayerAtLeave(itr->first, true, true);// remove player from BG
-            // do not change any battleground's private variables
+                // do not change any battleground's private variables
+            }
         }
     }
 
@@ -702,7 +709,7 @@ void BattleGround::EndBattleGround(uint32 winner)
         plr->GetSession()->SendPacket(&data);
 
         BattleGroundQueueTypeId bgQueueTypeId = BattleGroundMgr::BGQueueTypeId(GetTypeID(), GetArenaType());
-        sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, plr->GetTeam(), plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_IN_PROGRESS, TIME_TO_AUTOREMOVE, GetStartTime());
+        sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_IN_PROGRESS, TIME_TO_AUTOREMOVE, GetStartTime());
         plr->GetSession()->SendPacket(&data);
         plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_BATTLEGROUND, 1);
     }
@@ -944,7 +951,7 @@ void BattleGround::RemovePlayerAtLeave(uint64 guid, bool Transport, bool SendPac
             if(SendPacket)
             {
                 WorldPacket data;
-                sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, team, plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_NONE, 0, 0);
+                sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_NONE, 0, 0);
                 plr->GetSession()->SendPacket(&data);
             }
 
@@ -1679,7 +1686,7 @@ void BattleGround::PlayerAddedToBGCheckIfBGIsRunning(Player* plr)
     sBattleGroundMgr.BuildPvpLogDataPacket(&data, this);
     plr->GetSession()->SendPacket(&data);
 
-    sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, plr->GetTeam(), plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_IN_PROGRESS, TIME_TO_AUTOREMOVE, GetStartTime());
+    sBattleGroundMgr.BuildBattleGroundStatusPacket(&data, this, plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_IN_PROGRESS, TIME_TO_AUTOREMOVE, GetStartTime());
     plr->GetSession()->SendPacket(&data);
 }
 

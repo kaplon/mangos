@@ -803,7 +803,7 @@ void Spell::EffectDummy(uint32 i)
                     creatureTarget->RemoveCorpse();
                     creatureTarget->SetHealth(0);                   // just for nice GM-mode view
 
-                    DEBUG_LOG("AddObject at SpellEfects.cpp EffectDummy\n");
+                    DEBUG_LOG("AddObject at SpellEfects.cpp EffectDummy");
                     map->Add(pGameObj);
 
                     WorldPacket data(SMSG_GAMEOBJECT_SPAWN_ANIM_OBSOLETE, 8);
@@ -1256,7 +1256,7 @@ void Spell::EffectDummy(uint32 i)
             if (m_spellInfo->SpellFamilyFlags & 0x0000000000040000LL)
             {
                 // In 303 exist spirit depend
-                uint32 spirit = m_caster->GetStat(STAT_SPIRIT);
+                uint32 spirit = uint32(m_caster->GetStat(STAT_SPIRIT));
                 switch (m_spellInfo->Id)
                 {
                     case  1454: damage+=spirit; break;
@@ -1654,7 +1654,7 @@ void Spell::EffectDummy(uint32 i)
 
                 if(!spellInfo)
                 {
-                    sLog.outError("WORLD: unknown spell id %i\n", spell_id);
+                    sLog.outError("WORLD: unknown spell id %i", spell_id);
                     return;
                 }
 
@@ -1753,7 +1753,7 @@ void Spell::EffectTriggerSpellWithValue(uint32 i)
 
     if(!spellInfo)
     {
-        sLog.outError("EffectTriggerSpellWithValue of spell %u: triggering unknown spell id %i\n", m_spellInfo->Id,triggered_spell_id);
+        sLog.outError("EffectTriggerSpellWithValue of spell %u: triggering unknown spell id %i", m_spellInfo->Id,triggered_spell_id);
         return;
     }
 
@@ -2016,7 +2016,7 @@ void Spell::EffectTeleportUnits(uint32 i)
             SpellTargetPosition const* st = spellmgr.GetSpellTargetPosition(m_spellInfo->Id);
             if(!st)
             {
-                sLog.outError( "Spell::EffectTeleportUnits - unknown Teleport coordinates for spell ID %u\n", m_spellInfo->Id );
+                sLog.outError( "Spell::EffectTeleportUnits - unknown Teleport coordinates for spell ID %u", m_spellInfo->Id );
                 return;
             }
             ((Player*)unitTarget)->TeleportTo(st->target_mapId,st->target_X,st->target_Y,st->target_Z,st->target_Orientation,unitTarget==m_caster ? TELE_TO_SPELL : 0);
@@ -2056,7 +2056,7 @@ void Spell::EffectTeleportUnits(uint32 i)
             // If not exist data for dest location - return
             if(!(m_targets.m_targetMask & TARGET_FLAG_DEST_LOCATION))
             {
-                sLog.outError( "Spell::EffectTeleportUnits - unknown EffectImplicitTargetB[%u] = %u for spell ID %u\n", i, m_spellInfo->EffectImplicitTargetB[i], m_spellInfo->Id );
+                sLog.outError( "Spell::EffectTeleportUnits - unknown EffectImplicitTargetB[%u] = %u for spell ID %u", i, m_spellInfo->EffectImplicitTargetB[i], m_spellInfo->Id );
                 return;
             }
             // Init dest coordinates
@@ -2917,7 +2917,7 @@ void Spell::EffectOpenLock(uint32 /*i*/)
         if( goInfo->type == GAMEOBJECT_TYPE_BUTTON && goInfo->button.noDamageImmune ||
             goInfo->type == GAMEOBJECT_TYPE_GOOBER && goInfo->goober.losOK )
         {
-            //isAllowUseBattleGroundObject() already called in CanCast()
+            //CanUseBattleGroundObject() already called in CanCast()
             // in battleground check
             if(BattleGround *bg = player->GetBattleGround())
             {
@@ -2929,7 +2929,7 @@ void Spell::EffectOpenLock(uint32 /*i*/)
         }
         else if (goInfo->type == GAMEOBJECT_TYPE_FLAGSTAND)
         {
-            //isAllowUseBattleGroundObject() already called in CanCast()
+            //CanUseBattleGroundObject() already called in CanCast()
             // in battleground check
             if(BattleGround *bg = player->GetBattleGround())
             {
@@ -6295,7 +6295,7 @@ void Spell::EffectTransmitted(uint32 effIndex)
     pGameObj->SetUInt32Value(GAMEOBJECT_LEVEL, m_caster->getLevel() );
     pGameObj->SetSpellId(m_spellInfo->Id);
 
-    DEBUG_LOG("AddObject at SpellEfects.cpp EffectTransmitted\n");
+    DEBUG_LOG("AddObject at SpellEfects.cpp EffectTransmitted");
     //m_caster->AddGameObject(pGameObj);
     //m_ObjToDel.push_back(pGameObj);
 
