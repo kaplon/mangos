@@ -3354,7 +3354,7 @@ uint8 Spell::CheckRuneCost(uint32 runeCostID)
         runeCost[i] = src->RuneCost[i];
     }
 
-    runeCost[RUNE_DEATH] = 0;                               // calculated later
+    runeCost[RUNE_DEATH] = MAX_RUNES;                       // calculated later
 
     for(uint32 i = 0; i < MAX_RUNES; ++i)
     {
@@ -3373,7 +3373,7 @@ uint8 Spell::CheckRuneCost(uint32 runeCostID)
         }
     }
 
-    if(runeCost[RUNE_DEATH] > 0)
+    if(runeCost[RUNE_DEATH] > MAX_RUNES)
         return SPELL_FAILED_NO_POWER;                       // not sure if result code is correct
 
     return 0;
@@ -3756,7 +3756,10 @@ uint8 Spell::CanCast(bool strict)
                 return SPELL_FAILED_NOT_IN_ARENA;
 
     // zone check
-    if (uint8 res= spellmgr.GetSpellAllowedInLocationError(m_spellInfo,m_caster->GetMapId(),m_caster->GetZoneId(),m_caster->GetAreaId(),
+    uint32 zone, area;
+    m_caster->GetZoneAndAreaId(zone,area);
+
+    if (uint8 res= spellmgr.GetSpellAllowedInLocationError(m_spellInfo,m_caster->GetMapId(),zone,area,
         m_caster->GetTypeId()==TYPEID_PLAYER ? ((Player*)m_caster) : NULL))
         return res;
 
