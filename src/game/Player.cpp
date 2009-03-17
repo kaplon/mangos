@@ -2897,8 +2897,8 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
                 continue;
 
             if(_spell_idx->second->learnOnGetSkill == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL ||
-                // lockpicking special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
-                pSkill->id==SKILL_LOCKPICKING && _spell_idx->second->max_value==0 )
+                // lockpicking/runeforging special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
+                (pSkill->id==SKILL_LOCKPICKING || pSkill->id==SKILL_RUNEFORGING) && _spell_idx->second->max_value==0 )
             {
                 switch(GetSkillRangeType(pSkill,_spell_idx->second->racemask!=0))
                 {
@@ -2935,8 +2935,8 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
 
     if(IsInWorld())
     {
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SPELL);
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILLLINE_SPELLS);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SPELL,spell_id);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILLLINE_SPELLS,spell_id);
     }
 
     // return true (for send learn packet) only if spell active (in case ranked spells) and not replace old spell
@@ -3107,8 +3107,8 @@ void Player::removeSpell(uint32 spell_id, bool disabled, bool update_action_bar_
                 continue;
 
             if(_spell_idx->second->learnOnGetSkill == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL ||
-                // lockpicking special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
-                pSkill->id==SKILL_LOCKPICKING && _spell_idx->second->max_value==0 )
+                // lockpicking/runeforging special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
+                (pSkill->id==SKILL_LOCKPICKING || pSkill->id==SKILL_RUNEFORGING) && _spell_idx->second->max_value==0 )
             {
                 // not reset skills for professions and racial abilities
                 if( (pSkill->categoryId==SKILL_CATEGORY_SECONDARY || pSkill->categoryId==SKILL_CATEGORY_PROFESSION) &&
@@ -5951,8 +5951,8 @@ bool Player::ModifyOneFactionReputation(FactionEntry const* factionEntry, int32 
                 }
             }
         }
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_REPUTATION);
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_EXALTED_REPUTATION);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_REPUTATION,factionEntry->ID);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_EXALTED_REPUTATION,factionEntry->ID);
         SendFactionState(&(itr->second));
 
         return true;
@@ -6018,8 +6018,8 @@ bool Player::SetOneFactionReputation(FactionEntry const* factionEntry, int32 sta
             SetFactionAtWar(&itr->second,true);
 
         SendFactionState(&(itr->second));
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_REPUTATION);
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_EXALTED_REPUTATION);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_REPUTATION,factionEntry->ID);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GAIN_EXALTED_REPUTATION,factionEntry->ID);
         return true;
     }
     return false;
@@ -7039,7 +7039,7 @@ void Player::ApplyEquipSpell(SpellEntry const* spellInfo, Item* item, bool apply
     if(apply)
     {
         // Cannot be used in this stance/form
-        if(GetErrorAtShapeshiftedCast(spellInfo, m_form)!=0)
+        if(GetErrorAtShapeshiftedCast(spellInfo, m_form) != SPELL_CAST_OK)
             return;
 
         if(form_change)                                     // check aura active state from other form
@@ -7073,7 +7073,7 @@ void Player::ApplyEquipSpell(SpellEntry const* spellInfo, Item* item, bool apply
         if(form_change)                                     // check aura compatibility
         {
             // Cannot be used in this stance/form
-            if(GetErrorAtShapeshiftedCast(spellInfo, m_form)==0)
+            if(GetErrorAtShapeshiftedCast(spellInfo, m_form)==SPELL_CAST_OK)
                 return;                                     // and remove only not compatible at form change
         }
 
@@ -7485,6 +7485,9 @@ void Player::SendLootRelease( uint64 guid )
 
 void Player::SendLoot(uint64 guid, LootType loot_type)
 {
+    if (uint64 lguid = GetLootGUID())
+        m_session->DoLootRelease(lguid);
+
     Loot    *loot = 0;
     PermissionTypes permission = ALL_PERMISSION;
 
@@ -10837,6 +10840,8 @@ Item* Player::EquipItem( uint16 pos, Item *pItem, bool update )
         }
     }
 
+    // only for full equip instead adding to stack
+    GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
     return pItem;
 }
 
@@ -19412,7 +19417,7 @@ void Player::UpdateAreaDependentAuras( uint32 newArea )
     for(AuraMap::iterator iter = m_Auras.begin(); iter != m_Auras.end();)
     {
         // use m_zoneUpdateId for speed: UpdateArea called from UpdateZone or instead UpdateZone in both cases m_zoneUpdateId up-to-date
-        if(spellmgr.GetSpellAllowedInLocationError(iter->second->GetSpellProto(),GetMapId(),m_zoneUpdateId,newArea,this)!=0)
+        if(spellmgr.GetSpellAllowedInLocationError(iter->second->GetSpellProto(),GetMapId(),m_zoneUpdateId,newArea,this) != SPELL_CAST_OK)
             RemoveAura(iter);
         else
             ++iter;
@@ -19657,6 +19662,7 @@ bool Player::CanUseBattleGroundObject()
 {
     return ( //InBattleGround() &&                          // in battleground - not need, check in other cases
              //!IsMounted() && - not correct, player is dismounted when he clicks on flag
+             //i'm not sure if these two are correct, because invisible players should get visible when they click on flag
              !HasStealthAura() &&                           // not stealthed
              !HasInvisibilityAura() &&                      // not invisible
              !HasAura(SPELL_RECENTLY_DROPPED_FLAG, 0) &&    // can't pickup
@@ -19974,8 +19980,20 @@ void Player::_LoadSkills()
         else
             SetUInt32Value(PLAYER_SKILL_INDEX(i), MAKE_PAIR32(id,0));
 
-        uint32 vskill = SKILL_VALUE(GetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i)));
+        // set fixed skill ranges
+        switch(GetSkillRangeType(pSkill,false))
+        {
+            case SKILL_RANGE_LANGUAGE:                      // 300..300
+                SetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i),MAKE_SKILL_VALUE(300,300));
+                break;
+            case SKILL_RANGE_MONO:                          // 1..1, grey monolite bar
+                SetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i),MAKE_SKILL_VALUE(1,1));
+                break;
+            default:
+                break;
+        }
 
+        uint32 vskill = SKILL_VALUE(GetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i)));
         learnSkillRewardedSpells(id, vskill);
     }
 

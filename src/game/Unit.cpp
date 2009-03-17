@@ -2861,7 +2861,7 @@ uint32 Unit::GetWeaponSkillValue (WeaponAttackType attType, Unit const* target) 
         if(attType != BASE_ATTACK && !item )
             return 0;
 
-        if(((Player*)this)->IsInFeralForm())
+        if(IsInFeralForm())
             return GetMaxSkillValueForLevel();              // always maximized SKILL_FERAL_COMBAT in fact
 
         // weapon skill or (unarmed for base attack)
@@ -2987,7 +2987,7 @@ void Unit::_UpdateAutoRepeatSpell()
     if (isAttackReady(RANGED_ATTACK))
     {
         // Check if able to cast
-        if(m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->CanCast(true))
+        if(m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->CheckCast(true) != SPELL_CAST_OK)
         {
             InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
             return;
@@ -9664,7 +9664,7 @@ uint32 Unit::GetCreatureType() const
 {
     if(GetTypeId() == TYPEID_PLAYER)
     {
-        SpellShapeshiftEntry const* ssEntry = sSpellShapeshiftStore.LookupEntry(((Player*)this)->m_form);
+        SpellShapeshiftEntry const* ssEntry = sSpellShapeshiftStore.LookupEntry(m_form);
         if(ssEntry && ssEntry->creatureType > 0)
             return ssEntry->creatureType;
         else
@@ -10634,8 +10634,11 @@ Player* Unit::GetSpellModOwner()
 }
 
 ///----------Pet responses methods-----------------
-void Unit::SendPetCastFail(uint32 spellid, uint8 msg)
+void Unit::SendPetCastFail(uint32 spellid, SpellCastResult msg)
 {
+    if(msg == SPELL_CAST_OK)
+        return; 
+
     Unit *owner = GetCharmerOrOwner();
     if(!owner || owner->GetTypeId() != TYPEID_PLAYER)
         return;
