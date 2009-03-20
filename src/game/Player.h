@@ -51,6 +51,7 @@ class SpellCastTargets;
 class PlayerSocial;
 class AchievementMgr;
 class Vehicle;
+class OutdoorPvP;
 
 typedef std::deque<Mail*> PlayerMails;
 
@@ -1978,6 +1979,14 @@ class MANGOS_DLL_SPEC Player : public Unit
         bool GetBGAccessByLevel(BattleGroundTypeId bgTypeId) const;
         bool CanUseBattleGroundObject();
         bool CanCaptureTowerPoint();
+
+        /*********************************************************/
+        /***               OUTDOOR PVP SYSTEM                  ***/
+        /*********************************************************/
+
+        OutdoorPvP * GetOutdoorPvP() const;
+        // returns true if the player is in active state for outdoor pvp objective capturing, false otherwise
+        bool IsOutdoorPvPActive();
 
         /*********************************************************/
         /***                    REST SYSTEM                    ***/
