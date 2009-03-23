@@ -2048,8 +2048,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                     m_target->CastSpell(m_target, 51581, true, NULL, this);
                 return;
             case 43873:                                     // Headless Horseman Laugh
-                if(caster->GetTypeId() == TYPEID_PLAYER)
-                    ((Player*)caster)->PlaySound(11965, false);
+                m_target->PlayDistanceSound(11965);
                 return;
             case 46354:                                     // Blood Elf Illusion
                 if(caster)
@@ -3093,11 +3092,11 @@ void Aura::HandleModPossess(bool apply, bool Real)
             m_target->SetUInt32Value(UNIT_FIELD_FACTIONTEMPLATE,cinfo->faction_A);
         }
 
-        caster->SetCharm(0);
+        caster->SetCharm(NULL);
 
         if(caster->GetTypeId() == TYPEID_PLAYER)
         {
-            WorldPacket data(SMSG_PET_SPELLS, 8);
+            WorldPacket data(SMSG_PET_SPELLS, 8+4);
             data << uint64(0);
             data << uint32(0);
             ((Player*)caster)->GetSession()->SendPacket(&data);
@@ -3249,11 +3248,11 @@ void Aura::HandleModCharm(bool apply, bool Real)
                 }
             }
 
-            caster->SetCharm(0);
+            caster->SetCharm(NULL);
 
             if(caster->GetTypeId() == TYPEID_PLAYER)
             {
-                WorldPacket data(SMSG_PET_SPELLS, 8);
+                WorldPacket data(SMSG_PET_SPELLS, 8+4);
                 data << uint64(0);
                 data << uint32(0);
                 ((Player*)caster)->GetSession()->SendPacket(&data);
@@ -3309,6 +3308,7 @@ void Aura::HandleFeignDeath(bool apply, bool Real)
 
         m_target->addUnitState(UNIT_STAT_DIED);
         m_target->CombatStop();
+        m_target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION);
 
         // prevent interrupt message
         if(m_caster_guid==m_target->GetGUID() && m_target->m_currentSpells[CURRENT_GENERIC_SPELL])
@@ -3490,18 +3490,8 @@ void Aura::HandleModStealth(bool apply, bool Real)
 {
     if(apply)
     {
-        if(Real && m_target->GetTypeId()==TYPEID_PLAYER)
-        {
-            // drop flag at stealth in bg
-            if(((Player*)m_target)->InBattleGround())
-            {
-                if(BattleGround *bg = ((Player*)m_target)->GetBattleGround())
-                    bg->EventPlayerDroppedFlag((Player*)m_target);
-            }
-            // remove player from the objective's active player count at stealth
-            if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
-                pvp->HandlePlayerActivityChanged((Player*)m_target);
-        }
+        // drop flag at stealth in bg
+         m_target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION);
 
         // only at real aura add
         if(Real)
@@ -3516,7 +3506,13 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 m_target->SetVisibility(VISIBILITY_GROUP_NO_DETECT);
                 m_target->SetVisibility(VISIBILITY_GROUP_STEALTH);
             }
-        }
+        
+            // remove player from the objective's active player count at stealth
+            if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                pvp->HandlePlayerActivityChanged((Player*)m_target);
+
+		
+		}
     }
     else
     {
@@ -3538,13 +3534,11 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 }
                 else
                     m_target->SetVisibility(VISIBILITY_ON);
-                if(m_target->GetTypeId() == TYPEID_PLAYER)
-                {
-                    if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
-                        pvp->HandlePlayerActivityChanged((Player*)m_target);
-                    m_target->SendUpdateToPlayer((Player*)m_target);
-                }
-            }
+
+                if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                   pvp->HandlePlayerActivityChanged((Player*)m_target);
+
+			}
         }
     }
 
@@ -3572,6 +3566,8 @@ void Aura::HandleInvisibility(bool apply, bool Real)
     {
         m_target->m_invisibilityMask |= (1 << m_modifier.m_miscvalue);
 
+         m_target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION);
+
         if(Real && m_target->GetTypeId()==TYPEID_PLAYER)
         {
             // apply glow vision
@@ -3580,10 +3576,6 @@ void Aura::HandleInvisibility(bool apply, bool Real)
             if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
                 pvp->HandlePlayerActivityChanged((Player*)m_target);
 
-            // drop flag at invisible in bg
-            if(((Player*)m_target)->InBattleGround())
-                if(BattleGround *bg = ((Player*)m_target)->GetBattleGround())
-                    bg->EventPlayerDroppedFlag((Player*)m_target);
         }
 
         // apply only if not in GM invisibility and not stealth
@@ -4037,50 +4029,24 @@ void Aura::HandleModMechanicImmunity(bool apply, bool Real)
     }
 }
 
+//this method is called whenever we add / remove aura which gives m_target some imunity to some spell effect
 void Aura::HandleAuraModEffectImmunity(bool apply, bool Real)
 {
-    if(!apply)
+    // when removing flag aura, handle flag drop
+    if( !apply && m_target->GetTypeId() == TYPEID_PLAYER
+        && (GetSpellProto()->AuraInterruptFlags & AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION) )
     {
-        if(m_target->GetTypeId() == TYPEID_PLAYER)
-        {
-            if(((Player*)m_target)->InBattleGround())
-            {
-                BattleGround *bg = ((Player*)m_target)->GetBattleGround();
-                if(bg)
-                {
-                    switch(bg->GetTypeID())
-                    {
-                        case BATTLEGROUND_AV:
-                        {
-                            break;
-                        }
-                        case BATTLEGROUND_WS:
-                        {
-                            // Warsong Flag, horde               // Silverwing Flag, alliance
-                            if(GetId() == 23333 || GetId() == 23335)
-                                    bg->EventPlayerDroppedFlag(((Player*)m_target));
-                            break;
-                        }
-                        case BATTLEGROUND_AB:
-                        {
-                            break;
-                        }
-                        case BATTLEGROUND_EY:
-                        {
-                           if(GetId() == 34976)
-                                bg->EventPlayerDroppedFlag(((Player*)m_target));
-                            break;
-                        }
-                    }
-                }
-            }
-            else
-                sOutdoorPvPMgr.HandleDropFlag((Player*)m_target,GetSpellProto()->Id);
-        }
-    }
+        if( BattleGround *bg = ((Player*)m_target)->GetBattleGround() )
+            bg->EventPlayerDroppedFlag(((Player*)m_target));
+		else if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+            sOutdoorPvPMgr.HandleDropFlag((Player*)m_target,GetSpellProto()->Id);
+
+	}
 
     m_target->ApplySpellImmune(GetId(),IMMUNITY_EFFECT,m_modifier.m_miscvalue,apply);
 }
+
+
 
 void Aura::HandleAuraModStateImmunity(bool apply, bool Real)
 {
@@ -4106,28 +4072,33 @@ void Aura::HandleAuraModSchoolImmunity(bool apply, bool Real)
 {
     m_target->ApplySpellImmune(GetId(),IMMUNITY_SCHOOL,m_modifier.m_miscvalue,apply);
 
-    if(Real && apply && GetSpellProto()->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY)
+    // remove all flag auras (they are positive, but they must be removed when you are immune)
+    if( this->GetSpellProto()->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY
+        && this->GetSpellProto()->AttributesEx2 & SPELL_ATTR_EX2_DAMAGE_REDUCED_SHIELD )
+        m_target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION);
+
+    // TODO: optimalize this cycle - use RemoveAurasWithInterruptFlags call or something else
+    if( Real && apply
+        && GetSpellProto()->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY
+        && IsPositiveSpell(GetId()) )                       //Only positive immunity removes auras
     {
-        if(IsPositiveSpell(GetId()))                        //Only positive immunity removes auras
+        uint32 school_mask = m_modifier.m_miscvalue;
+        Unit::AuraMap& Auras = m_target->GetAuras();
+        for(Unit::AuraMap::iterator iter = Auras.begin(), next; iter != Auras.end(); iter = next)
         {
-            uint32 school_mask = m_modifier.m_miscvalue;
-            Unit::AuraMap& Auras = m_target->GetAuras();
-            for(Unit::AuraMap::iterator iter = Auras.begin(), next; iter != Auras.end(); iter = next)
+            next = iter;
+            ++next;
+            SpellEntry const *spell = iter->second->GetSpellProto();
+            if((GetSpellSchoolMask(spell) & school_mask)//Check for school mask
+                && !( spell->Attributes & SPELL_ATTR_UNAFFECTED_BY_INVULNERABILITY)   //Spells unaffected by invulnerability
+                && !iter->second->IsPositive()          //Don't remove positive spells
+                && spell->Id != GetId() )               //Don't remove self
             {
-                next = iter;
-                ++next;
-                SpellEntry const *spell = iter->second->GetSpellProto();
-                if((GetSpellSchoolMask(spell) & school_mask)//Check for school mask
-                    && !( spell->Attributes & SPELL_ATTR_UNAFFECTED_BY_INVULNERABILITY)   //Spells unaffected by invulnerability
-                    && !iter->second->IsPositive()          //Don't remove positive spells
-                    && spell->Id != GetId() )               //Don't remove self
-                {
-                    m_target->RemoveAurasDueToSpell(spell->Id);
-                    if(Auras.empty())
-                        break;
-                    else
-                        next = Auras.begin();
-                }
+                m_target->RemoveAurasDueToSpell(spell->Id);
+                if(Auras.empty())
+                    break;
+                else
+                    next = Auras.begin();
             }
         }
     }
@@ -5588,8 +5559,10 @@ void Aura::HandleAuraRetainComboPoints(bool apply, bool Real)
 void Aura::HandleModUnattackable( bool Apply, bool Real )
 {
     if(Real && Apply)
+     {
         m_target->CombatStop();
-
+        m_target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_IMMUNE_OR_LOST_SELECTION);
+     }
     m_target->ApplyModFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE,Apply);
 }
 

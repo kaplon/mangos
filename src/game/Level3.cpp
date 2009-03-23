@@ -882,21 +882,6 @@ bool ChatHandler::HandleAccountSetPasswordCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleAllowMovementCommand(const char* /*args*/)
-{
-    if(sWorld.getAllowMovement())
-    {
-        sWorld.SetAllowMovement(false);
-        SendSysMessage(LANG_CREATURE_MOVE_DISABLED);
-    }
-    else
-    {
-        sWorld.SetAllowMovement(true);
-        SendSysMessage(LANG_CREATURE_MOVE_ENABLED);
-    }
-    return true;
-}
-
 bool ChatHandler::HandleMaxSkillCommand(const char* /*args*/)
 {
     Player* SelectedPlayer = getSelectedPlayer();
@@ -1781,8 +1766,8 @@ bool ChatHandler::HandleLearnAllMyTalentsCommand(const char* /*args*/)
 
         // search highest talent rank
         uint32 spellid = 0;
-        int rank = 4;
-        for(; rank >= 0; --rank)
+        
+        for(int rank = MAX_TALENT_RANK-1; rank >= 0; --rank)
         {
             if(talentInfo->RankID[rank]!=0)
             {
@@ -3554,6 +3539,21 @@ bool ChatHandler::HandleNearGraveCommand(const char* args)
 }
 
 //-----------------------Npc Commands-----------------------
+bool ChatHandler::HandleNpcAllowMovementCommand(const char* /*args*/)
+{
+    if(sWorld.getAllowMovement())
+    {
+        sWorld.SetAllowMovement(false);
+        SendSysMessage(LANG_CREATURE_MOVE_DISABLED);
+    }
+    else
+    {
+        sWorld.SetAllowMovement(true);
+        SendSysMessage(LANG_CREATURE_MOVE_ENABLED);
+    }
+    return true;
+}
+
 bool ChatHandler::HandleNpcChangeEntryCommand(const char *args)
 {
     if(!args)

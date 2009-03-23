@@ -213,13 +213,41 @@ bool ChatHandler::HandleDebugUpdateWorldStateCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleDebugPlaySound2Command(const char* args)
+//Play sound
+bool ChatHandler::HandleDebugPlaySoundCommand(const char* args)
 {
-    if(!args)
+    // USAGE: .debug playsound #soundid
+    // #soundid - ID decimal number from SoundEntries.dbc (1st column)
+    if( !*args )
+    {
+        SendSysMessage(LANG_BAD_VALUE);
+        SetSentErrorMessage(true);
         return false;
+    }
 
-    uint32 soundid = atoi(args);
-    m_session->GetPlayer()->PlaySound(soundid, false);
+    uint32 dwSoundId = atoi((char*)args);
+
+    if(!sSoundEntriesStore.LookupEntry(dwSoundId))
+    {
+        PSendSysMessage(LANG_SOUND_NOT_EXIST, dwSoundId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    Unit* unit = getSelectedUnit();
+    if(!unit)
+    {
+        SendSysMessage(LANG_SELECT_CHAR_OR_CREATURE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if(m_session->GetPlayer()->GetSelection())
+        unit->PlayDistanceSound(dwSoundId,m_session->GetPlayer());
+    else
+        unit->PlayDirectSound(dwSoundId,m_session->GetPlayer());
+
+    PSendSysMessage(LANG_YOU_HEAR_SOUND, dwSoundId);
     return true;
 }
 
@@ -564,7 +592,7 @@ bool ChatHandler::HandleDebugSpawnVehicle(const char* args)
 
     if(!v->IsPositionValid())
     {
-        sLog.outError("ERROR: Vehicle (guidlow %d, entry %d) not created. Suggested coordinates isn't valid (X: %f Y: %f)",
+        sLog.outError("Vehicle (guidlow %d, entry %d) not created. Suggested coordinates isn't valid (X: %f Y: %f)",
             v->GetGUIDLow(), v->GetEntry(), v->GetPositionX(), v->GetPositionY());
         delete v;
         return false;
@@ -592,5 +620,29 @@ bool ChatHandler::HandleDebugSendSetPhaseShiftCommand(const char* args)
 
     uint32 PhaseShift = atoi(args);
     m_session->SendSetPhaseShift(PhaseShift);
+    return true;
+}
+
+bool ChatHandler::HandleDebugSetItemFlagCommand(const char* args)
+{
+    if(!args)
+        return false;
+
+    char* e = strtok((char*)args, " ");
+    char* f = strtok(NULL, " ");
+
+    if (!e || !f)
+        return false;
+
+    uint32 guid = (uint32)atoi(e);
+    uint32 flag = (uint32)atoi(f);
+
+    Item *i = m_session->GetPlayer()->GetItemByGuid(MAKE_NEW_GUID(guid, 0, HIGHGUID_ITEM));
+
+    if(!i)
+        return false;
+
+    i->SetUInt32Value(ITEM_FIELD_FLAGS, flag);
+
     return true;
 }
