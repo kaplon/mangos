@@ -3537,9 +3537,11 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 else
                     m_target->SetVisibility(VISIBILITY_ON);
 
-                if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
-                   pvp->HandlePlayerActivityChanged((Player*)m_target);
-
+				if(((Player*)m_target)->GetTypeId()==TYPEID_PLAYER)
+    			{
+                    if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                       pvp->HandlePlayerActivityChanged((Player*)m_target);
+				}
 			}
         }
     }
