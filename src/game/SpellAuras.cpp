@@ -3508,9 +3508,11 @@ void Aura::HandleModStealth(bool apply, bool Real)
             }
         
             // remove player from the objective's active player count at stealth
-            if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
-                pvp->HandlePlayerActivityChanged((Player*)m_target);
-
+			if(((Player*)m_target)->GetTypeId()==TYPEID_PLAYER)
+			{
+			    if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                    pvp->HandlePlayerActivityChanged((Player*)m_target);
+			}
 		
 		}
     }
