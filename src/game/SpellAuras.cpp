@@ -2919,20 +2919,8 @@ void Aura::HandleForceReaction(bool apply, bool Real)
     uint32 faction_id = m_modifier.m_miscvalue;
     uint32 faction_rank = m_modifier.m_amount;
 
-    if(apply)
-        player->m_forcedReactions[faction_id] = ReputationRank(faction_rank);
-    else
-        player->m_forcedReactions.erase(faction_id);
-
-    WorldPacket data;
-    data.Initialize(SMSG_SET_FORCED_REACTIONS, 4+player->m_forcedReactions.size()*(4+4));
-    data << uint32(player->m_forcedReactions.size());
-    for(ForcedReactions::const_iterator itr = player->m_forcedReactions.begin(); itr != player->m_forcedReactions.end(); ++itr)
-    {
-        data << uint32(itr->first);                         // faction_id (Faction.dbc)
-        data << uint32(itr->second);                        // reputation rank
-    }
-    player->SendDirectMessage(&data);
+    player->GetReputationMgr().ApplyForceReaction(faction_id,ReputationRank(faction_rank),apply);
+    player->GetReputationMgr().SendForceReactions();
 }
 
 void Aura::HandleAuraModSkill(bool apply, bool Real)
@@ -3062,7 +3050,14 @@ void Aura::HandleModPossess(bool apply, bool Real)
     {
         m_target->SetCharmerGUID(GetCasterGUID());
         m_target->SetUInt32Value(UNIT_FIELD_FACTIONTEMPLATE,caster->getFaction());
+
         caster->SetCharm(m_target);
+
+        if(caster->GetTypeId() == TYPEID_PLAYER)
+        {
+            ((Player*)caster)->SetFarSightGUID(m_target->GetGUID());
+            ((Player*)caster)->SetClientControl(m_target, 1);
+        }
 
         m_target->CombatStop();
         m_target->DeleteThreatList();
@@ -3096,11 +3091,15 @@ void Aura::HandleModPossess(bool apply, bool Real)
 
         if(caster->GetTypeId() == TYPEID_PLAYER)
         {
+            ((Player*)caster)->SetFarSightGUID(0);
+            ((Player*)caster)->SetClientControl(m_target,0);
+
             WorldPacket data(SMSG_PET_SPELLS, 8+4);
             data << uint64(0);
             data << uint32(0);
             ((Player*)caster)->GetSession()->SendPacket(&data);
         }
+
         if(m_target->GetTypeId() == TYPEID_UNIT)
         {
             ((Creature*)m_target)->AIM_Initialize();
@@ -3109,8 +3108,6 @@ void Aura::HandleModPossess(bool apply, bool Real)
                 ((Creature*)m_target)->AI()->AttackStart(caster);
         }
     }
-    if(caster->GetTypeId() == TYPEID_PLAYER)
-        ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
 void Aura::HandleModPossessPet(bool apply, bool Real)
