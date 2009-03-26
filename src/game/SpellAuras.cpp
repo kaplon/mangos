@@ -3503,15 +3503,15 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 m_target->SetVisibility(VISIBILITY_GROUP_NO_DETECT);
                 m_target->SetVisibility(VISIBILITY_GROUP_STEALTH);
             }
-        
+
             // remove player from the objective's active player count at stealth
-			if(((Player*)m_target)->GetTypeId()==TYPEID_PLAYER)
-			{
-			    if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+            if(m_target->GetTypeId() == TYPEID_PLAYER)
+            {
+                if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
                     pvp->HandlePlayerActivityChanged((Player*)m_target);
-			}
-		
-		}
+            }
+
+        }
     }
     else
     {
@@ -3534,12 +3534,12 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 else
                     m_target->SetVisibility(VISIBILITY_ON);
 
-				if(((Player*)m_target)->GetTypeId()==TYPEID_PLAYER)
-    			{
+                if(m_target->GetTypeId() == TYPEID_PLAYER)
+                {
                     if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
                        pvp->HandlePlayerActivityChanged((Player*)m_target);
-				}
-			}
+                }
+            }
         }
     }
 
