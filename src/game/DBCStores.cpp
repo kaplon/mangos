@@ -17,12 +17,11 @@
  */
 
 #include "DBCStores.h"
-//#include "DataStore.h"
 #include "Policies/SingletonImp.h"
 #include "Log.h"
 #include "ProgressBar.h"
 
-#include "DBCfmt.cpp"
+#include "DBCfmt.h"
 
 #include <map>
 
@@ -130,6 +129,7 @@ static uint32 sTalentTabPages[12/*MAX_CLASSES*/][3];
 
 DBCStorage <TaxiNodesEntry> sTaxiNodesStore(TaxiNodesEntryfmt);
 TaxiMask sTaxiNodesMask;
+TaxiMask sOldContinentsNodesMask;
 
 // DBC used only for initialization sTaxiPathSetBySource at startup.
 TaxiPathSetBySource sTaxiPathSetBySource;
@@ -160,7 +160,7 @@ template<class T>
 inline void LoadDBC(uint32& availableDbcLocales,barGoLink& bar, StoreProblemList& errlist, DBCStorage<T>& storage, const std::string& dbc_path, const std::string& filename)
 {
     // compatibility format and C++ structure sizes
-    assert(DBCFile::GetFormatRecordSize(storage.GetFormat()) == sizeof(T) || LoadDBC_assert_print(DBCFile::GetFormatRecordSize(storage.GetFormat()),sizeof(T),filename));
+    assert(DBCFileLoader::GetFormatRecordSize(storage.GetFormat()) == sizeof(T) || LoadDBC_assert_print(DBCFileLoader::GetFormatRecordSize(storage.GetFormat()),sizeof(T),filename));
 
     std::string dbc_filename = dbc_path + filename;
     if(storage.Load(dbc_filename.c_str()))
@@ -455,9 +455,11 @@ void LoadDBCStores(const std::string& dataPath)
                         spellPaths.insert(sInfo->EffectMiscValue[j]);
 
         memset(sTaxiNodesMask,0,sizeof(sTaxiNodesMask));
+        memset(sOldContinentsNodesMask,0,sizeof(sTaxiNodesMask));
         for(uint32 i = 1; i < sTaxiNodesStore.GetNumRows(); ++i)
         {
-            if(!sTaxiNodesStore.LookupEntry(i))
+            TaxiNodesEntry const* node = sTaxiNodesStore.LookupEntry(i);
+            if(!node)
                 continue;
 
             TaxiPathSetBySource::const_iterator src_i = sTaxiPathSetBySource.find(i);
@@ -478,10 +480,14 @@ void LoadDBCStores(const std::string& dataPath)
                     continue;
             }
 
-            // valid taxi netowrk node
+            // valid taxi network node
             uint8  field   = (uint8)((i - 1) / 32);
             uint32 submask = 1<<((i-1)%32);
             sTaxiNodesMask[field] |= submask;
+
+            // old continent node (+ nodes virtually at old continents, check explicitly to avoid loading map files for zone info)
+            if (node->map_id < 2 || i == 82 || i == 83 || i == 93 || i == 94)
+                sOldContinentsNodesMask[field] |= submask;
         }
     }
 

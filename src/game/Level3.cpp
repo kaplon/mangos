@@ -758,6 +758,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char* args)
         arg2 = arg1;
 
         targetAccountId = targetPlayer->GetSession()->GetAccountId();
+        accmgr.GetName(targetAccountId, targetAccountName);
     }
     else
     {
@@ -791,7 +792,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char* args)
     }
 
     /// can set security level only for target with less security and to less security that we have
-    /// This is also reject self apply in fact
+    /// This will reject self apply by specify account name
     if(HasLowerSecurityAccount(NULL,targetAccountId,true))
         return false;
 
@@ -804,7 +805,8 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char* args)
         return false;
     }
 
-    if(targetPlayer)
+    // This will prevent self apply by self target or no target
+    if(targetPlayer && m_session->GetPlayer()!=targetPlayer)
     {
         ChatHandler(targetPlayer).PSendSysMessage(LANG_YOURS_SECURITY_CHANGED,GetNameLink().c_str(), gm);
         targetPlayer->GetSession()->SetSecurity(gm);
@@ -1788,6 +1790,82 @@ bool ChatHandler::HandleLearnAllMyTalentsCommand(const char* /*args*/)
     }
 
     SendSysMessage(LANG_COMMAND_LEARN_CLASS_TALENTS);
+    return true;
+}
+
+bool ChatHandler::HandleLearnAllMyPetTalentsCommand(const char* /*args*/)
+{
+    Player* player = m_session->GetPlayer();
+
+    Pet* pet = player->GetPet();
+    if(!pet)
+    {
+        SendSysMessage(LANG_NO_PET_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    CreatureInfo const *ci = pet->GetCreatureInfo();
+    if(!ci)
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    CreatureFamilyEntry const *pet_family = sCreatureFamilyStore.LookupEntry(ci->family);
+    if(!pet_family)
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if(pet_family->petTalentType < 0)                       // not hunter pet
+    {
+        SendSysMessage(LANG_WRONG_PET_TYPE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    for (uint32 i = 0; i < sTalentStore.GetNumRows(); i++)
+    {
+        TalentEntry const *talentInfo = sTalentStore.LookupEntry(i);
+        if(!talentInfo)
+            continue;
+
+        TalentTabEntry const *talentTabInfo = sTalentTabStore.LookupEntry( talentInfo->TalentTab );
+        if(!talentTabInfo)
+            continue;
+
+        // prevent learn talent for different family (cheating)
+        if(((1 << pet_family->petTalentType) & talentTabInfo->petTalentMask)==0)
+            continue;
+
+        // search highest talent rank
+        uint32 spellid = 0;
+
+        for(int rank = MAX_TALENT_RANK-1; rank >= 0; --rank)
+        {
+            if(talentInfo->RankID[rank]!=0)
+            {
+                spellid = talentInfo->RankID[rank];
+                break;
+            }
+        }
+
+        if(!spellid)                                        // ??? none spells in talent
+            continue;
+
+        SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellid);
+        if(!spellInfo || !SpellMgr::IsSpellValid(spellInfo,m_session->GetPlayer(),false))
+            continue;
+
+        // learn highest rank of talent and learn all non-talent spell ranks (recursive by tree)
+        pet->learnSpellHighRank(spellid);
+    }
+
+    SendSysMessage(LANG_COMMAND_LEARN_PET_TALENTS);
     return true;
 }
 
@@ -3556,7 +3634,7 @@ bool ChatHandler::HandleNpcAllowMovementCommand(const char* /*args*/)
 
 bool ChatHandler::HandleNpcChangeEntryCommand(const char *args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     uint32 newEntryNum = atoi(args);
@@ -4644,9 +4722,9 @@ bool ChatHandler::HandleResetTalentsCommand(const char * args)
         if (owner && owner->GetTypeId() == TYPEID_PLAYER)
         {
             player = (Player *)owner;
-            ChatHandler(player).SendSysMessage(LANG_RESET_TALENTS);
+            ChatHandler(player).SendSysMessage(LANG_RESET_PET_TALENTS);
             if(m_session->GetPlayer()!=player)
-                PSendSysMessage(LANG_RESET_TALENTS_ONLINE,GetNameLink(player).c_str());
+                PSendSysMessage(LANG_RESET_PET_TALENTS_ONLINE,GetNameLink(player).c_str());
         }
         return true;
     }
@@ -5047,7 +5125,7 @@ bool ChatHandler::HandleBanIPCommand(const char* args)
 
 bool ChatHandler::HandleBanHelper(BanMode mode, const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char* cnameOrIP = strtok ((char*)args, " ");
@@ -5135,7 +5213,7 @@ bool ChatHandler::HandleUnBanIPCommand(const char* args)
 
 bool ChatHandler::HandleUnBanHelper(BanMode mode, const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char* cnameOrIP = strtok ((char*)args, " ");
@@ -5178,7 +5256,7 @@ bool ChatHandler::HandleUnBanHelper(BanMode mode, const char* args)
 
 bool ChatHandler::HandleBanInfoAccountCommand(const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char* cname = strtok((char*)args, "");
@@ -5205,7 +5283,7 @@ bool ChatHandler::HandleBanInfoAccountCommand(const char* args)
 
 bool ChatHandler::HandleBanInfoCharacterCommand(const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     std::string name = extractPlayerNameFromLink((char*)args);
@@ -5264,7 +5342,7 @@ bool ChatHandler::HandleBanInfoHelper(uint32 accountid, char const* accountname)
 
 bool ChatHandler::HandleBanInfoIPCommand(const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char* cIP = strtok ((char*)args, "");
@@ -5533,7 +5611,7 @@ bool ChatHandler::HandleRespawnCommand(const char* /*args*/)
 
 bool ChatHandler::HandleGMFlyModeCommand(const char* args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     Player *target = getSelectedPlayer();
@@ -5559,7 +5637,7 @@ bool ChatHandler::HandleGMFlyModeCommand(const char* args)
 
 bool ChatHandler::HandlePDumpLoadCommand(const char *args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char * file = strtok((char*)args, " ");
@@ -5670,7 +5748,7 @@ bool ChatHandler::HandlePDumpLoadCommand(const char *args)
 
 bool ChatHandler::HandlePDumpWriteCommand(const char *args)
 {
-    if(!args)
+    if (!*args)
         return false;
 
     char* file = strtok((char*)args, " ");

@@ -130,7 +130,18 @@ PlayerTaxi::PlayerTaxi()
 
 void PlayerTaxi::InitTaxiNodesForLevel(uint32 race, uint32 chrClass, uint32 level)
 {
-    // capital and taxi hub masks
+    // class specific initial known nodes
+    switch(chrClass)
+    {
+        case CLASS_DEATH_KNIGHT:
+        {
+            for(int i = 0; i < TaxiMaskSize; ++i)
+                m_taximask[i] |= sOldContinentsNodesMask[i];
+            break;
+        }
+    }
+
+    // race specific initial known nodes: capital and taxi hub masks
     switch(race)
     {
         case RACE_HUMAN:    SetTaximaskNode(2);  break;     // Human
@@ -144,12 +155,6 @@ void PlayerTaxi::InitTaxiNodesForLevel(uint32 race, uint32 chrClass, uint32 leve
         case RACE_TROLL:    SetTaximaskNode(23); break;     // Troll
         case RACE_BLOODELF: SetTaximaskNode(82); break;     // Blood Elf
         case RACE_DRAENEI:  SetTaximaskNode(94); break;     // Draenei
-    }
-
-    switch(chrClass)
-    {
-        case CLASS_DEATH_KNIGHT:                            // TODO: figure out initial known nodes
-            break;
     }
 
     // new continent starting masks (It will be accessible only at new map)
@@ -349,8 +354,6 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
     m_DailyQuestChanged = false;
     m_lastDailyQuestTime = 0;
 
-    m_regenTimer = 0;
-    m_weaponChangeTimer = 0;
     for (int i=0; i<MAX_TIMERS; i++)
         m_MirrorTimer[i] = DISABLED_MIRROR_TIMER;
 
@@ -1103,8 +1106,6 @@ void Player::Update( uint32 p_time )
     CheckDuelDistance(now);
 
     UpdateAfkReport(now);
-
-    CheckExploreSystem();
 
     // Update items that have just a limited lifetime
     if (now>m_Last_tick)
@@ -4511,9 +4512,7 @@ float Player::GetTotalBaseModValue(BaseModGroup modGroup) const
 
 uint32 Player::GetShieldBlockValue() const
 {
-    BaseModGroup modGroup = SHIELD_BLOCK_VALUE;
-
-    float value = GetTotalBaseModValue(modGroup) + GetStat(STAT_STRENGTH) * 0.5f - 10;
+    float value = (m_auraBaseMod[SHIELD_BLOCK_VALUE][FLAT_MOD] + GetStat(STAT_STRENGTH) * 0.5f - 10)*m_auraBaseMod[SHIELD_BLOCK_VALUE][PCT_MOD];
 
     value = (value < 0) ? 0 : value;
 
@@ -4840,7 +4839,7 @@ bool Player::UpdateSkill(uint32 skill_id, uint32 step)
             new_value = max;
 
         SetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i),MAKE_SKILL_VALUE(new_value,max));
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL,skill_id);
         return true;
     }
 
@@ -4979,7 +4978,7 @@ bool Player::UpdateSkillPro(uint16 SkillId, int32 Chance, uint32 step)
                 break;
             }
         }
-        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL);
+        GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL,SkillId);
         sLog.outDebug("Player::UpdateSkillPro Chance=%3.1f%% taken", Chance/10.0);
         return true;
     }
@@ -5156,7 +5155,8 @@ void Player::SetSkill(uint32 id, uint16 currVal, uint16 maxVal)
         {
             SetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i),MAKE_SKILL_VALUE(currVal,maxVal));
             learnSkillRewardedSpells(id, currVal);
-            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL);
+            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL,id);
+            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LEVEL,id);
         }
         else                                                //remove
         {
@@ -5189,7 +5189,8 @@ void Player::SetSkill(uint32 id, uint16 currVal, uint16 maxVal)
             else
                 SetUInt32Value(PLAYER_SKILL_INDEX(i), MAKE_PAIR32(id,0));
             SetUInt32Value(PLAYER_SKILL_VALUE_INDEX(i),MAKE_SKILL_VALUE(currVal,maxVal));
-            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL);
+            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL,id);
+            GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LEVEL,id);
 
             // apply skill bonuses
             SetUInt32Value(PLAYER_SKILL_BONUS_INDEX(i),0);
@@ -17660,13 +17661,14 @@ void Player::LeaveBattleground(bool teleportToEntryPoint)
 {
     if(BattleGround *bg = GetBattleGround())
     {
-        bool need_debuf = bg->isBattleGround() && (bg->GetStatus() == STATUS_IN_PROGRESS) && sWorld.getConfig(CONFIG_BATTLEGROUND_CAST_DESERTER);
-
         bg->RemovePlayerAtLeave(GetGUID(), teleportToEntryPoint, true);
 
         // call after remove to be sure that player resurrected for correct cast
-        if(need_debuf)
-            CastSpell(this, 26013, true);                   // Deserter
+        if( bg->isBattleGround() && sWorld.getConfig(CONFIG_BATTLEGROUND_CAST_DESERTER) )
+        {
+            if( bg->GetStatus() == STATUS_IN_PROGRESS || bg->GetStatus() == STATUS_WAIT_JOIN )
+                CastSpell(this, 26013, true);               // Deserter
+        }
     }
 }
 
@@ -18812,6 +18814,31 @@ bool Player::RewardPlayerAndGroupAtKill(Unit* pVictim)
         }
     }
     return xp || honored_kill;
+}
+
+void Player::RewardPlayerAndGroupAtEvent(uint32 creature_id, WorldObject* pRewardSource)
+{
+    uint64 creature_guid = pRewardSource->GetTypeId()==TYPEID_UNIT ? pRewardSource->GetGUID() : uint64(0);
+
+    // prepare data for near group iteration
+    if(Group *pGroup = GetGroup())
+    {
+        for(GroupReference *itr = pGroup->GetFirstMember(); itr != NULL; itr = itr->next())
+        {
+            Player* pGroupGuy = itr->getSource();
+            if(!pGroupGuy)
+                continue;
+
+            if(!pGroupGuy->IsAtGroupRewardDistance(pRewardSource))
+                continue;                               // member (alive or dead) or his corpse at req. distance
+
+            // quest objectives updated only for alive group member or dead but with not released body
+            if(pGroupGuy->isAlive()|| !pGroupGuy->GetCorpse())
+                pGroupGuy->KilledMonster(creature_id, creature_guid);
+        }
+    }
+    else                                                    // if (!pGroup)
+        KilledMonster(creature_id, creature_guid);
 }
 
 bool Player::IsAtGroupRewardDistance(WorldObject const* pRewardSource) const

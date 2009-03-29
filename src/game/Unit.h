@@ -31,7 +31,7 @@
 #include "FollowerRefManager.h"
 #include "Utilities/EventProcessor.h"
 #include "MotionMaster.h"
-#include "Database/DBCStructure.h"
+#include "DBCStructure.h"
 #include <list>
 
 enum SpellInterruptFlags
@@ -1114,6 +1114,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
             return this;
         }
         Player* GetCharmerOrOwnerPlayerOrPlayerItself();
+        float GetCombatDistance( const Unit* target ) const;
 
         void SetPet(Pet* pet);
         void SetCharm(Unit* pet);
