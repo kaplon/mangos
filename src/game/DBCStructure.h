@@ -52,8 +52,8 @@ struct AchievementEntry
     //uint32    icon;                                       // 42 icon (from SpellIcon.dbc)
     //char *titleReward[16];                                // 43-58
     //uint32 titleReward_flags;                             // 59
-    //uint32 count;                                         // 60 - need this count Criteria for complete
-    uint32 refAchievement;                                  // 61 - related achievement?
+    uint32 count;                                           // 60 - need this count of completed criterias (own or referenced achievement criterias)
+    uint32 refAchievement;                                  // 61 - referenced achievement (counting of all completed criterias)
 };
 
 struct AchievementCategoryEntry
@@ -648,6 +648,27 @@ struct ChrRacesEntry
     uint32      addon;                                      // 68 (0 - original race, 1 - tbc addon, ...)
 };
 
+/* not used
+struct CinematicCameraEntry
+{
+    uint32      id;                                         // 0 index
+    char*       filename;                                   // 1
+    uint32      soundid;                                    // 2 in SoundEntries.dbc or 0
+    float       start_x;                                    // 3
+    float       start_y;                                    // 4
+    float       start_z;                                    // 5
+    float       unk6;                                       // 6 speed?     
+};
+*/
+
+struct CinematicSequencesEntry
+{
+    uint32      Id;                                         // 0 index
+    //uint32      unk1;                                     // 1 always 0
+    //uint32      cinematicCamera;                          // 2 id in CinematicCamera.dbc
+                                                            // 3-9 always 0
+};
+
 struct CreatureDisplayInfoEntry
 {
     uint32      Displayid;                                  // 0        m_ID
@@ -1075,6 +1096,13 @@ struct MapEntry
     {
         return MapID == 0 || MapID == 1 || MapID == 530 || MapID == 571;
     }
+};
+
+struct MovieEntry
+{
+    uint32      Id;                                         // 0 index
+    //char*       filename;                                 // 1
+    //uint32      unk2;                                     // 2 always 100
 };
 
 struct QuestSortEntry
