@@ -3548,7 +3548,6 @@ void Aura::HandleModStealth(bool apply, bool Real)
                     }
                 }
             }
->>>>>>> master:src/game/SpellAuras.cpp
         }
     }
     else
