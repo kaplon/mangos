@@ -2935,7 +2935,7 @@ void Unit::_UpdateSpells( uint32 time )
 
     if(!m_gameObj.empty())
     {
-        std::list<GameObject*>::iterator ite1, dnext1;
+        GameObjectList::iterator ite1, dnext1;
         for (ite1 = m_gameObj.begin(); ite1 != m_gameObj.end(); ite1 = dnext1)
         {
             dnext1 = ite1;
@@ -3062,7 +3062,7 @@ void Unit::InterruptSpell(uint32 spellType, bool withDelayed)
 {
     assert(spellType < CURRENT_MAX_SPELL);
 
-    if(m_currentSpells[spellType] && (withDelayed || m_currentSpells[spellType]->getState() != SPELL_STATE_DELAYED) )
+    if (m_currentSpells[spellType] && (withDelayed || m_currentSpells[spellType]->getState() != SPELL_STATE_DELAYED) )
     {
         // send autorepeat cancel message for autorepeat spells
         if (spellType == CURRENT_AUTOREPEAT_SPELL)
@@ -3073,8 +3073,13 @@ void Unit::InterruptSpell(uint32 spellType, bool withDelayed)
 
         if (m_currentSpells[spellType]->getState() != SPELL_STATE_FINISHED)
             m_currentSpells[spellType]->cancel();
-        m_currentSpells[spellType]->SetReferencedFromCurrent(false);
-        m_currentSpells[spellType] = NULL;
+
+        // cancel can interrupt spell already (caster cancel ->target aura remove -> caster iterrupt)
+        if (m_currentSpells[spellType])
+        {
+            m_currentSpells[spellType]->SetReferencedFromCurrent(false);
+            m_currentSpells[spellType] = NULL;
+        }
     }
 }
 
@@ -3105,36 +3110,15 @@ void Unit::InterruptNonMeleeSpells(bool withDelayed, uint32 spell_id)
 {
     // generic spells are interrupted if they are not finished or delayed
     if (m_currentSpells[CURRENT_GENERIC_SPELL] && (!spell_id || m_currentSpells[CURRENT_GENERIC_SPELL]->m_spellInfo->Id==spell_id))
-    {
-        if  ( (m_currentSpells[CURRENT_GENERIC_SPELL]->getState() != SPELL_STATE_FINISHED) &&
-            (withDelayed || m_currentSpells[CURRENT_GENERIC_SPELL]->getState() != SPELL_STATE_DELAYED) )
-            m_currentSpells[CURRENT_GENERIC_SPELL]->cancel();
-        m_currentSpells[CURRENT_GENERIC_SPELL]->SetReferencedFromCurrent(false);
-        m_currentSpells[CURRENT_GENERIC_SPELL] = NULL;
-    }
+        InterruptSpell(CURRENT_GENERIC_SPELL,withDelayed);
 
     // autorepeat spells are interrupted if they are not finished or delayed
     if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL] && (!spell_id || m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->m_spellInfo->Id==spell_id))
-    {
-        // send disable autorepeat packet in any case
-        if(GetTypeId()==TYPEID_PLAYER)
-            ((Player*)this)->SendAutoRepeatCancel();
-
-        if ( (m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->getState() != SPELL_STATE_FINISHED) &&
-            (withDelayed || m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->getState() != SPELL_STATE_DELAYED) )
-            m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->cancel();
-        m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->SetReferencedFromCurrent(false);
-        m_currentSpells[CURRENT_AUTOREPEAT_SPELL] = NULL;
-    }
+        InterruptSpell(CURRENT_AUTOREPEAT_SPELL,withDelayed);
 
     // channeled spells are interrupted if they are not finished, even if they are delayed
     if (m_currentSpells[CURRENT_CHANNELED_SPELL] && (!spell_id || m_currentSpells[CURRENT_CHANNELED_SPELL]->m_spellInfo->Id==spell_id))
-    {
-        if (m_currentSpells[CURRENT_CHANNELED_SPELL]->getState() != SPELL_STATE_FINISHED)
-            m_currentSpells[CURRENT_CHANNELED_SPELL]->cancel();
-        m_currentSpells[CURRENT_CHANNELED_SPELL]->SetReferencedFromCurrent(false);
-        m_currentSpells[CURRENT_CHANNELED_SPELL] = NULL;
-    }
+        InterruptSpell(CURRENT_CHANNELED_SPELL,true);
 }
 
 Spell* Unit::FindCurrentSpellBySpellId(uint32 spell_id) const
@@ -4078,6 +4062,15 @@ DynamicObject * Unit::GetDynObject(uint32 spellId)
     return NULL;
 }
 
+GameObject* Unit::GetGameObject(uint32 spellId) const
+{
+    for (GameObjectList::const_iterator i = m_gameObj.begin(); i != m_gameObj.end();)
+        if ((*i)->GetSpellId() == spellId)
+            return *i;
+
+    return NULL;
+}
+
 void Unit::AddGameObject(GameObject* gameObj)
 {
     assert(gameObj && gameObj->GetOwnerGUID()==0);
@@ -4128,7 +4121,7 @@ void Unit::RemoveGameObject(uint32 spellid, bool del)
 {
     if(m_gameObj.empty())
         return;
-    std::list<GameObject*>::iterator i, next;
+    GameObjectList::iterator i, next;
     for (i = m_gameObj.begin(); i != m_gameObj.end(); i = next)
     {
         next = i;
@@ -4151,7 +4144,7 @@ void Unit::RemoveGameObject(uint32 spellid, bool del)
 void Unit::RemoveAllGameObjects()
 {
     // remove references to unit
-    for(std::list<GameObject*>::iterator i = m_gameObj.begin(); i != m_gameObj.end();)
+    for(GameObjectList::iterator i = m_gameObj.begin(); i != m_gameObj.end();)
     {
         (*i)->SetOwnerGUID(0);
         (*i)->SetRespawnTime(0);
@@ -8568,21 +8561,7 @@ void Unit::Mount(uint32 mount)
 
     // unsummon pet
     if(GetTypeId() == TYPEID_PLAYER)
-    {
-        Pet* pet = GetPet();
-        if(pet)
-        {
-            if(pet->isControlled())
-            {
-                ((Player*)this)->SetTemporaryUnsummonedPetNumber(pet->GetCharmInfo()->GetPetNumber());
-                ((Player*)this)->SetOldPetSpell(pet->GetUInt32Value(UNIT_CREATED_BY_SPELL));
-            }
-
-            ((Player*)this)->RemovePet(NULL,PET_SAVE_NOT_IN_SLOT);
-        }
-        else
-            ((Player*)this)->SetTemporaryUnsummonedPetNumber(0);
-    }
+        ((Player*)this)->UnsummonPetTemporaryIfAny();
 }
 
 void Unit::Unmount()
@@ -8598,14 +8577,8 @@ void Unit::Unmount()
     // only resummon old pet if the player is already added to a map
     // this prevents adding a pet to a not created map which would otherwise cause a crash
     // (it could probably happen when logging in after a previous crash)
-    if(GetTypeId() == TYPEID_PLAYER && IsInWorld() && ((Player*)this)->GetTemporaryUnsummonedPetNumber() && isAlive())
-    {
-        Pet* NewPet = new Pet;
-        if(!NewPet->LoadPetFromDB((Player*)this, 0, ((Player*)this)->GetTemporaryUnsummonedPetNumber(), true))
-            delete NewPet;
-
-        ((Player*)this)->SetTemporaryUnsummonedPetNumber(0);
-    }
+    if(GetTypeId() == TYPEID_PLAYER)
+        ((Player*)this)->ResummonPetTemporaryUnSummonedIfAny();
 }
 
 void Unit::SetInCombatWith(Unit* enemy)

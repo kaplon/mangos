@@ -476,7 +476,7 @@ struct AchievementCriteriaEntry
         struct
         {
             uint32  field3;                                 // 3 main requirement
-            uint32  field4;                                 // 4 main requirement count
+            uint32  count;                                  // 4 main requirement count
             uint32  additionalRequirement1_type;            // 5 additional requirement 1 type
             uint32  additionalRequirement1_value;           // 6 additional requirement 1 value
             uint32  additionalRequirement2_type;            // 7 additional requirement 2 type
@@ -1624,6 +1624,7 @@ struct WorldMapAreaEntry
     float   x1;                                             // 6
     float   x2;                                             // 7
     int32   virtual_map_id;                                 // 8 -1 (map_id have correct map) other: virtual map where zone show (map_id - where zone in fact internally)
+    // int32   dungeonMap_id;                               // 9 pointer to DungeonMap.dbc (owerride x1,x2,y1,y2 coordinates)
 };
 
 struct WorldSafeLocsEntry
