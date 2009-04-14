@@ -27,7 +27,7 @@ class MANGOS_DLL_DECL OutdoorPvPObjectiveAI : public CreatureAI
 {
     public:
 
-        OutdoorPvPObjectiveAI(Creature &c);
+        explicit OutdoorPvPObjectiveAI(Creature *c);
 
         void MoveInLineOfSight(Unit *);
         bool IsVisible(Unit *) const;
@@ -37,7 +37,7 @@ class MANGOS_DLL_DECL OutdoorPvPObjectiveAI : public CreatureAI
 
         static int Permissible(const Creature *);
 
-    private:
-        Creature &i_creature;
+//    private:
+//        Creature &i_creature;
 };
 #endif
