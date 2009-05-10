@@ -46,6 +46,7 @@
 // |color|Hskill:skill_id|h[name]|h|r
 // |color|Hspell:spell_id|h[name]|h|r                                     - client, spellbook spell icon shift-click
 // |color|Htalent:talent_id,rank|h[name]|h|r                              - client, talent icon shift-click
+// |color|Htaxinode:id|h[name]|h|r
 // |color|Htele:id|h[name]|h|r
 // |color|Htrade:spell_id,cur_value,max_value,unk3int,unk3str|h[name]|h|r - client, spellbook profession icon shift-click
 
@@ -186,6 +187,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "graveyard",      SEC_MODERATOR,      false, &ChatHandler::HandleGoGraveyardCommand,         "", NULL },
         { "grid",           SEC_MODERATOR,      false, &ChatHandler::HandleGoGridCommand,              "", NULL },
         { "object",         SEC_MODERATOR,      false, &ChatHandler::HandleGoObjectCommand,            "", NULL },
+        { "taxinode",       SEC_MODERATOR,      false, &ChatHandler::HandleGoTaxinodeCommand,          "", NULL },
         { "trigger",        SEC_MODERATOR,      false, &ChatHandler::HandleGoTriggerCommand,           "", NULL },
         { "zonexy",         SEC_MODERATOR,      false, &ChatHandler::HandleGoZoneXYCommand,            "", NULL },
         { "xy",             SEC_MODERATOR,      false, &ChatHandler::HandleGoXYCommand,                "", NULL },
@@ -279,6 +281,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "player",         SEC_GAMEMASTER,     true,  NULL,                                           "", lookupPlayerCommandTable },
         { "skill",          SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleLookupSkillCommand,         "", NULL },
         { "spell",          SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleLookupSpellCommand,         "", NULL },
+        { "taxinode",       SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleLookupTaxiNodeCommand,      "", NULL },
         { "tele",           SEC_MODERATOR,      true,  &ChatHandler::HandleLookupTeleCommand,          "", NULL },
         { NULL,             0,                  false, NULL,                                           "", NULL }
     };
@@ -420,6 +423,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "page_text",                   SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadPageTextsCommand,               "", NULL },
         { "pickpocketing_loot_template", SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadLootTemplatesPickpocketingCommand,"",NULL},
         { "points_of_interest",          SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadPointsOfInterestCommand,        "",NULL},
+        { "npc_spellclick_spells",       SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadSpellClickSpellsCommand,          "",NULL},
         { "prospecting_loot_template",   SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadLootTemplatesProspectingCommand,"", NULL },
         { "quest_mail_loot_template",    SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadLootTemplatesQuestMailCommand,  "", NULL },
         { "quest_end_scripts",           SEC_ADMINISTRATOR, true,  &ChatHandler::HandleReloadQuestEndScriptsCommand,         "", NULL },
@@ -707,7 +711,7 @@ bool ChatHandler::HasLowerSecurityAccount(WorldSession* target, uint32 target_ac
     else
         return true;                                        // caller must report error for (target==NULL && target_account==0)
 
-    if (m_session->GetSecurity() < target_sec || strong && m_session->GetSecurity() <= target_sec)
+    if (m_session->GetSecurity() < target_sec || (strong && m_session->GetSecurity() <= target_sec))
     {
         SendSysMessage(LANG_YOURS_SECURITY_IS_LOW);
         SetSentErrorMessage(true);
@@ -816,7 +820,7 @@ bool ChatHandler::ExecuteCommandInTable(ChatCommand *table, const char* text, co
 
     while (*text == ' ') ++text;
 
-    for(uint32 i = 0; table[i].Name != NULL; i++)
+    for(uint32 i = 0; table[i].Name != NULL; ++i)
     {
         if( !hasStringAbbr(table[i].Name, cmd.c_str()) )
             continue;
@@ -937,27 +941,27 @@ int ChatHandler::ParseCommands(const char* text)
     //    return 0;
 
     /// chat case (.command or !command format)
-    if(m_session)
+    if (m_session)
     {
         if(text[0] != '!' && text[0] != '.')
             return 0;
     }
 
     /// ignore single . and ! in line
-    if(strlen(text) < 2)
+    if (strlen(text) < 2)
         return 0;
 
     /// ignore messages staring from many dots.
-    if(text[0] == '.' && text[1] == '.' || text[0] == '!' && text[1] == '!')
+    if ((text[0] == '.' && text[1] == '.') || (text[0] == '!' && text[1] == '!'))
         return 0;
 
     /// skip first . or ! (in console allowed use command with . and ! and without its)
-    if(text[0] == '!' || text[0] == '.')
+    if (text[0] == '!' || text[0] == '.')
         ++text;
 
     std::string fullcmd = text;                             // original `text` can't be used. It content destroyed in command code processing.
 
-    if(!ExecuteCommandInTable(getCommandTable(), text, fullcmd))
+    if (!ExecuteCommandInTable(getCommandTable(), text, fullcmd))
         SendSysMessage(LANG_NO_CMD);
 
     return 1;

@@ -105,6 +105,21 @@ enum Gossip_Guard_Skill
     GOSSIP_GUARD_SKILL_ENGINERING   = 91
 };
 
+enum GossipOptionIcon
+{
+    GOSSIP_ICON_CHAT                = 0,                    //white chat bubble
+    GOSSIP_ICON_VENDOR              = 1,                    //brown bag
+    GOSSIP_ICON_TAXI                = 2,                    //flight
+    GOSSIP_ICON_TRAINER             = 3,                    //book
+    GOSSIP_ICON_INTERACT_1          = 4,                    //interaction wheel
+    GOSSIP_ICON_INTERACT_2          = 5,                    //interaction wheel
+    GOSSIP_ICON_MONEY_BAG           = 6,                    //brown bag with yellow dot
+    GOSSIP_ICON_TALK                = 7,                    //white chat bubble with black dots
+    GOSSIP_ICON_TABARD              = 8,                    //tabard
+    GOSSIP_ICON_BATTLE              = 9,                    //two swords
+    GOSSIP_ICON_DOT                 = 10                    //yellow dot
+};
+
 struct GossipOption
 {
     uint32 Id;
@@ -323,9 +338,11 @@ enum AttackingTarget
     ATTACKING_TARGET_RANDOM = 0,                            //Just selects a random target
     ATTACKING_TARGET_TOPAGGRO,                              //Selects targes from top aggro to bottom
     ATTACKING_TARGET_BOTTOMAGGRO,                           //Selects targets from bottom aggro to top
+    /* not implemented
     ATTACKING_TARGET_RANDOM_PLAYER,                         //Just selects a random target (player only)
     ATTACKING_TARGET_TOPAGGRO_PLAYER,                       //Selects targes from top aggro to bottom (player only)
     ATTACKING_TARGET_BOTTOMAGGRO_PLAYER,                    //Selects targets from bottom aggro to top (player only)
+    */
 };
 
 // GCC have alternative #pragma pack() syntax and old gcc version not support pack(pop), also any gcc version not support it at some platform
@@ -369,7 +386,7 @@ struct VendorItemData
 
     void Clear()
     {
-        for (VendorItemList::iterator itr = m_items.begin(); itr != m_items.end(); ++itr)
+        for (VendorItemList::const_iterator itr = m_items.begin(); itr != m_items.end(); ++itr)
             delete (*itr);
         m_items.clear();
     }
@@ -599,6 +616,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         bool IsVisibleInGridForPlayer(Player* pl) const;
 
         void RemoveCorpse();
+        bool isDeadByDefault() const { return m_isDeadByDefault; };
 
         time_t const& GetRespawnTime() const { return m_respawnTime; }
         time_t GetRespawnTimeEx() const;

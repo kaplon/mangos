@@ -656,24 +656,25 @@ struct CalcDamageInfo
 
 // Spell damage info structure based on structure sending in SMSG_SPELLNONMELEEDAMAGELOG opcode
 struct SpellNonMeleeDamage{
- SpellNonMeleeDamage(Unit *_attacker, Unit *_target, uint32 _SpellID, uint32 _schoolMask)
-    : target(_target), attacker(_attacker), SpellID(_SpellID), damage(0), schoolMask(_schoolMask),
-    absorb(0), resist(0), phusicalLog(false), unused(false), blocked(0), HitInfo(0), cleanDamage(0)
- {}
+    SpellNonMeleeDamage(Unit *_attacker, Unit *_target, uint32 _SpellID, uint32 _schoolMask)
+        : target(_target), attacker(_attacker), SpellID(_SpellID), damage(0), overkill(0), schoolMask(_schoolMask),
+        absorb(0), resist(0), physicalLog(false), unused(false), blocked(0), HitInfo(0), cleanDamage(0)
+    {}
 
- Unit   *target;
- Unit   *attacker;
- uint32 SpellID;
- uint32 damage;
- uint32 schoolMask;
- uint32 absorb;
- uint32 resist;
- bool   phusicalLog;
- bool   unused;
- uint32 blocked;
- uint32 HitInfo;
- // Used for help
- uint32 cleanDamage;
+    Unit   *target;
+    Unit   *attacker;
+    uint32 SpellID;
+    uint32 damage;
+    uint32 overkill;
+    uint32 schoolMask;
+    uint32 absorb;
+    uint32 resist;
+    bool   physicalLog;
+    bool   unused;
+    uint32 blocked;
+    uint32 HitInfo;
+    // Used for help
+    uint32 cleanDamage;
 };
 
 uint32 createProcExtendMask(SpellNonMeleeDamage *damageInfo, SpellMissInfo missCondition);
@@ -831,7 +832,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
 
         void _addAttacker(Unit *pAttacker)                  // must be called only from Unit::Attack(Unit*)
         {
-            AttackerSet::iterator itr = m_attackers.find(pAttacker);
+            AttackerSet::const_iterator itr = m_attackers.find(pAttacker);
             if(itr == m_attackers.end())
                 m_attackers.insert(pAttacker);
         }
@@ -952,6 +953,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         void Unmount();
 
         uint16 GetMaxSkillValueForLevel(Unit const* target = NULL) const { return (target ? getLevelForTarget(target) : getLevel()) * 5; }
+        void DealDamageMods(Unit *pVictim, uint32 &damage, uint32* absorb);
         uint32 DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDamage, DamageEffectType damagetype, SpellSchoolMask damageSchoolMask, SpellEntry const *spellProto, bool durabilityLoss);
         int32 DealHeal(Unit *pVictim, uint32 addhealth, SpellEntry const *spellProto, bool critical = false);
 
@@ -1019,7 +1021,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         bool isInFlight()  const { return hasUnitState(UNIT_STAT_IN_FLIGHT); }
 
         bool isInCombat()  const { return HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT); }
-        void SetInCombatState(bool PvP);
+        void SetInCombatState(bool PvP, Unit* enemy = NULL);
         void SetInCombatWith(Unit* enemy);
         void ClearInCombat();
         uint32 GetCombatTimer() const { return m_CombatTimer; }
@@ -1050,7 +1052,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
 
         void SendHealSpellLog(Unit *pVictim, uint32 SpellID, uint32 Damage, bool critical = false);
         void SendEnergizeSpellLog(Unit *pVictim, uint32 SpellID, uint32 Damage,Powers powertype);
-        uint32 SpellNonMeleeDamageLog(Unit *pVictim, uint32 spellID, uint32 damage, bool isTriggeredSpell = false, bool useSpellDamage = true);
+        uint32 SpellNonMeleeDamageLog(Unit *pVictim, uint32 spellID, uint32 damage);
         void CastSpell(Unit* Victim, uint32 spellId, bool triggered, Item *castItem = NULL, Aura* triggeredByAura = NULL, uint64 originalCaster = 0);
         void CastSpell(Unit* Victim,SpellEntry const *spellInfo, bool triggered, Item *castItem= NULL, Aura* triggeredByAura = NULL, uint64 originalCaster = 0);
         void CastCustomSpell(Unit* Victim, uint32 spellId, int32 const* bp0, int32 const* bp1, int32 const* bp2, bool triggered, Item *castItem= NULL, Aura* triggeredByAura = NULL, uint64 originalCaster = 0);
@@ -1276,7 +1278,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
 
         uint32 GetVisibleAura(uint8 slot)
         {
-            VisibleAuraMap::iterator itr = m_visibleAuras.find(slot);
+            VisibleAuraMap::const_iterator itr = m_visibleAuras.find(slot);
             if(itr != m_visibleAuras.end())
                 return itr->second;
             return 0;

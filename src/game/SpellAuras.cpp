@@ -45,6 +45,7 @@
 #include "Util.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
+#include "Vehicle.h"
 #include "CellImpl.h"
 
 #define NULL_AURA_SLOT 0xFF
@@ -195,7 +196,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandleRangedAmmoHaste,                           //141 SPELL_AURA_MOD_RANGED_AMMO_HASTE
     &Aura::HandleAuraModBaseResistancePCT,                  //142 SPELL_AURA_MOD_BASE_RESISTANCE_PCT
     &Aura::HandleAuraModResistanceExclusive,                //143 SPELL_AURA_MOD_RESISTANCE_EXCLUSIVE
-    &Aura::HandleNoImmediateEffect,                         //144 SPELL_AURA_SAFE_FALL                  implemented in WorldSession::HandleMovementOpcodes
+    &Aura::HandleAuraSafeFall,                              //144 SPELL_AURA_SAFE_FALL                         implemented in WorldSession::HandleMovementOpcodes
     &Aura::HandleAuraModPetTalentsPoints,                   //145 SPELL_AURA_MOD_PET_TALENT_POINTS
     &Aura::HandleNoImmediateEffect,                         //146 SPELL_AURA_ALLOW_TAME_PET_TYPE
     &Aura::HandleNULL,                                      //147 SPELL_AURA_ADD_CREATURE_IMMUNITY
@@ -345,11 +346,11 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
 static AuraType const frozenAuraTypes[] = { SPELL_AURA_MOD_ROOT, SPELL_AURA_MOD_STUN, SPELL_AURA_NONE };
 
 Aura::Aura(SpellEntry const* spellproto, uint32 eff, int32 *currentBasePoints, Unit *target, Unit *caster, Item* castItem) :
-m_spellmod(NULL), m_caster_guid(0), m_castItemGuid(castItem?castItem->GetGUID():0), m_target(target),
+m_spellmod(NULL), m_caster_guid(0), m_target(target), m_castItemGuid(castItem?castItem->GetGUID():0),
 m_timeCla(1000), m_periodicTimer(0), m_removeMode(AURA_REMOVE_BY_DEFAULT), m_AuraDRGroup(DIMINISHING_NONE),
 m_effIndex(eff), m_auraSlot(MAX_AURAS), m_auraFlags(AFLAG_NONE), m_auraLevel(1), m_procCharges(0), m_stackAmount(1),
 m_positive(false), m_permanent(false), m_isPeriodic(false), m_isAreaAura(false), m_isPersistent(false),
-m_updated(false), m_isRemovedOnShapeLost(true), m_in_use(false)
+m_isRemovedOnShapeLost(true), m_updated(false), m_in_use(false)
 {
     assert(target);
 
@@ -697,7 +698,6 @@ void AreaAura::Update(uint32 diff)
 
                     if( pGroup)
                     {
-                        uint8 subgroup = ((Player*)owner)->GetSubGroup();
                         for(GroupReference *itr = pGroup->GetFirstMember(); itr != NULL; itr = itr->next())
                         {
                             Player* Target = itr->getSource();
@@ -1301,7 +1301,7 @@ void Aura::HandleAddModifier(bool apply, bool Real)
             m_target->CastSpell(m_target,45471,true);
     }
 }
-void Aura::HandleAddTargetTrigger(bool apply, bool Real)
+void Aura::HandleAddTargetTrigger(bool apply, bool /*Real*/)
 {
     // Use SpellModifier structure for check
     // used only fields:
@@ -2178,64 +2178,97 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
     {
         case SPELLFAMILY_GENERIC:
         {
-            // Unstable Power
-            if( GetId()==24658 )
+            switch(GetId())
             {
-                uint32 spellId = 24659;
-                if (apply)
+                // Unstable Power
+                case 24658:
                 {
-                    const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
-                    if (!spell)
-                        return;
-                    for (int i=0; i < spell->StackAmount; ++i)
-                        caster->CastSpell(m_target, spell->Id, true, NULL, NULL, GetCasterGUID());
-                    return;
-                }
-                m_target->RemoveAurasDueToSpell(spellId);
-                return;
-            }
-            // Restless Strength
-            if( GetId()==24661 )
-            {
-                uint32 spellId = 24662;
-                if (apply)
-                {
-                    const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
-                    if (!spell)
-                        return;
-                    for (int i=0; i < spell->StackAmount; ++i)
-                        caster->CastSpell(m_target, spell->Id, true, NULL, NULL, GetCasterGUID());
-                    return;
-                }
-                m_target->RemoveAurasDueToSpell(spellId);
-                return;
-            }
-            //Summon Fire Elemental
-            if (GetId() == 40133 && caster)
-            {
-                Unit *owner = caster->GetOwner();
-                if (owner && owner->GetTypeId() == TYPEID_PLAYER)
-                {
-                    if(apply)
-                        owner->CastSpell(owner,8985,true);
-                    else
-                        ((Player*)owner)->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT, true);
-                }
-                return;
-            }
+                    uint32 spellId = 24659;
+                    if (apply && caster)
+                    {
+                        const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
+                        if (!spell)
+                            return;
 
-            //Summon Earth Elemental
-            if (GetId() == 40132 && caster)
-            {
-                Unit *owner = caster->GetOwner();
-                if (owner && owner->GetTypeId() == TYPEID_PLAYER)
-                {
-                    if(apply)
-                        owner->CastSpell(owner,19704,true);
-                    else
-                        ((Player*)owner)->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT, true);
+                        for (int i=0; i < spell->StackAmount; ++i)
+                            caster->CastSpell(m_target, spell->Id, true, NULL, NULL, GetCasterGUID());
+                        return;
+                    }
+                    m_target->RemoveAurasDueToSpell(spellId);
+                    return;
                 }
-                return;
+                // Restless Strength
+                case 24661:
+                {
+                    uint32 spellId = 24662;
+                    if (apply && caster)
+                    {
+                        const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
+                        if (!spell)
+                            return;
+                        for (int i=0; i < spell->StackAmount; ++i)
+                            caster->CastSpell(m_target, spell->Id, true, NULL, NULL, GetCasterGUID());
+                        return;
+                    }
+                    m_target->RemoveAurasDueToSpell(spellId);
+                    return;
+                }
+                //Summon Fire Elemental
+                case 40133:
+                {
+                    if (!caster)
+                        return;
+
+                    Unit *owner = caster->GetOwner();
+                    if (owner && owner->GetTypeId() == TYPEID_PLAYER)
+                    {
+                        if(apply)
+                            owner->CastSpell(owner,8985,true);
+                        else
+                            ((Player*)owner)->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT, true);
+                    }
+                    return;
+                }
+                //Summon Earth Elemental
+                case 40132 :
+                {
+                    if (!caster)
+                        return;
+
+                    Unit *owner = caster->GetOwner();
+                    if (owner && owner->GetTypeId() == TYPEID_PLAYER)
+                    {
+                        if(apply)
+                            owner->CastSpell(owner,19704,true);
+                        else
+                            ((Player*)owner)->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT, true);
+                    }
+                    return;
+                }
+                // LK Intro VO (1)
+                case 58204:
+                    if(m_target->GetTypeId() == TYPEID_PLAYER)
+                    {
+                        // Play part 1
+                        if(apply)
+                            m_target->PlayDirectSound(14970, (Player *)m_target);
+                        // continue in 58205
+                        else
+                            m_target->CastSpell(m_target, 58205, true);
+                    }
+                    return;
+                // LK Intro VO (2)
+                case 58205:
+                    if(m_target->GetTypeId() == TYPEID_PLAYER)
+                    {
+                        // Play part 2
+                        if(apply)
+                            m_target->PlayDirectSound(14971, (Player *)m_target);
+                        // Play part 3
+                        else
+                            m_target->PlayDirectSound(14972, (Player *)m_target);
+                    }
+                    return;
             }
             break;
         }
@@ -2270,6 +2303,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             switch(GetId())
             {
                 case 34246:                                 // Idol of the Emerald Queen
+                case 60779:                                 // Idol of Lush Moss
                 {
                     if (m_target->GetTypeId() != TYPEID_PLAYER)
                         return;
@@ -2348,29 +2382,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             break;
         }
         case SPELLFAMILY_HUNTER:
-        {
-            // Improved Aspect of the Viper
-            if( GetId()==38390 && m_target->GetTypeId()==TYPEID_PLAYER )
-            {
-                if(apply)
-                {
-                    // + effect value for Aspect of the Viper
-                    SpellModifier *mod = new SpellModifier;
-                    mod->op = SPELLMOD_EFFECT1;
-                    mod->value = m_modifier.m_amount;
-                    mod->type = SPELLMOD_FLAT;
-                    mod->spellId = GetId();
-                    mod->mask = 0x4000000000000LL;
-                    mod->mask2= 0LL;
-
-                    m_spellmod = mod;
-                }
-
-                ((Player*)m_target)->AddSpellMod(m_spellmod, apply);
-                return;
-            }
             break;
-        }
         case SPELLFAMILY_SHAMAN:
         {
             // Improved Weapon Totems
@@ -2519,7 +2531,7 @@ void Aura::HandleAuraHover(bool apply, bool Real)
     m_target->SendMessageToSet(&data,true);
 }
 
-void Aura::HandleWaterBreathing(bool apply, bool Real)
+void Aura::HandleWaterBreathing(bool /*apply*/, bool /*Real*/)
 {
     // update timers in client
     if(m_target->GetTypeId()==TYPEID_PLAYER)
@@ -2735,18 +2747,16 @@ void Aura::HandleAuraModShapeshift(bool apply, bool Real)
             case FORM_BEAR:
             case FORM_DIREBEAR:
             case FORM_CAT:
-            {
                 if(Aura* dummy = m_target->GetDummyAura(37315) )
                     m_target->CastSpell(m_target,37316,true,NULL,dummy);
                 break;
-            }
             // Nordrassil Regalia - bonus
             case FORM_MOONKIN:
-            {
                 if(Aura* dummy = m_target->GetDummyAura(37324) )
                     m_target->CastSpell(m_target,37325,true,NULL,dummy);
                 break;
-            }
+            default:
+                break;
         }
     }
 
@@ -2928,7 +2938,7 @@ void Aura::HandleForceReaction(bool apply, bool Real)
     player->GetReputationMgr().SendForceReactions();
 }
 
-void Aura::HandleAuraModSkill(bool apply, bool Real)
+void Aura::HandleAuraModSkill(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -2981,7 +2991,7 @@ void Aura::HandleChannelDeathItem(bool apply, bool Real)
     }
 }
 
-void Aura::HandleBindSight(bool apply, bool Real)
+void Aura::HandleBindSight(bool apply, bool /*Real*/)
 {
     Unit* caster = GetCaster();
     if(!caster || caster->GetTypeId() != TYPEID_PLAYER)
@@ -2990,7 +3000,7 @@ void Aura::HandleBindSight(bool apply, bool Real)
     ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
-void Aura::HandleFarSight(bool apply, bool Real)
+void Aura::HandleFarSight(bool apply, bool /*Real*/)
 {
     Unit* caster = GetCaster();
     if(!caster || caster->GetTypeId() != TYPEID_PLAYER)
@@ -2999,7 +3009,7 @@ void Aura::HandleFarSight(bool apply, bool Real)
     ((Player*)caster)->SetFarSightGUID(apply ? m_target->GetGUID() : 0);
 }
 
-void Aura::HandleAuraTrackCreatures(bool apply, bool Real)
+void Aura::HandleAuraTrackCreatures(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -3009,7 +3019,7 @@ void Aura::HandleAuraTrackCreatures(bool apply, bool Real)
     m_target->SetUInt32Value(PLAYER_TRACK_CREATURES, apply ? ((uint32)1)<<(m_modifier.m_miscvalue-1) : 0 );
 }
 
-void Aura::HandleAuraTrackResources(bool apply, bool Real)
+void Aura::HandleAuraTrackResources(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -3019,7 +3029,7 @@ void Aura::HandleAuraTrackResources(bool apply, bool Real)
     m_target->SetUInt32Value(PLAYER_TRACK_RESOURCES, apply ? ((uint32)1)<<(m_modifier.m_miscvalue-1): 0 );
 }
 
-void Aura::HandleAuraTrackStealthed(bool apply, bool Real)
+void Aura::HandleAuraTrackStealthed(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -3030,7 +3040,7 @@ void Aura::HandleAuraTrackStealthed(bool apply, bool Real)
     m_target->ApplyModFlag(PLAYER_FIELD_BYTES,PLAYER_FIELD_BYTE_TRACK_STEALTHED,apply);
 }
 
-void Aura::HandleAuraModScale(bool apply, bool Real)
+void Aura::HandleAuraModScale(bool apply, bool /*Real*/)
 {
     m_target->ApplyPercentModFloatValue(OBJECT_FIELD_SCALE_X,m_modifier.m_amount,apply);
 }
@@ -3158,7 +3168,7 @@ void Aura::HandleModPossessPet(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModPetTalentsPoints(bool Apply, bool Real)
+void Aura::HandleAuraModPetTalentsPoints(bool /*Apply*/, bool Real)
 {
     if(!Real)
         return;
@@ -3498,6 +3508,7 @@ void Aura::HandleAuraModStun(bool apply, bool Real)
 void Aura::HandleModStealth(bool apply, bool Real)
 {
     Unit* pTarget = m_target;
+    SpellEntry const* pSpellInfo = GetSpellProto();
 
     if (apply)
     {
@@ -3540,10 +3551,10 @@ void Aura::HandleModStealth(bool apply, bool Real)
                         pTarget->CastCustomSpell(pTarget,31665,&bp,NULL,NULL,true);
                     }
                     // Overkill
-                    else if ((*i)->GetId() == 58426 && GetSpellProto()->SpellFamilyFlags & 0x0000000000400000LL)
+                    else if ((*i)->GetId() == 58426 && pSpellInfo->SpellFamilyFlags & 0x0000000000400000LL)
                     {
                         pTarget->RemoveAurasDueToSpell(58428);
-                        pTarget->CastSpell(m_target, 58427, true);
+                        pTarget->CastSpell(pTarget, 58427, true);
                     }
                 }
             }
@@ -3586,8 +3597,8 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 if ((*i)->GetSpellProto()->SpellIconID == 2114)
                     pTarget->CastSpell(pTarget,31666,true);
                 // Overkill
-                else if ((*i)->GetId() == 58426 && GetSpellProto()->SpellFamilyFlags & 0x0000000000400000LL)
-                    pTarget->CastSpell(m_target, 58428, true);
+                else if ((*i)->GetId() == 58426 && pSpellInfo->SpellFamilyFlags & 0x0000000000400000LL)
+                    pTarget->CastSpell(pTarget, 58428, true);
             }
         }
     }
@@ -3676,7 +3687,6 @@ void Aura::HandleAuraModRoot(bool apply, bool Real)
     if(!Real)
         return;
 
-    uint32 apply_stat = UNIT_STAT_ROOT;
     if (apply)
     {
         // Frost root aura -> freeze/unfreeze target
@@ -3974,7 +3984,7 @@ void Aura::HandleAuraModUseNormalSpeed(bool /*apply*/, bool Real)
 /***                     IMMUNITY                      ***/
 /*********************************************************/
 
-void Aura::HandleModMechanicImmunity(bool apply, bool Real)
+void Aura::HandleModMechanicImmunity(bool apply, bool /*Real*/)
 {
     uint32 mechanic = 1 << m_modifier.m_miscvalue;
 
@@ -3982,21 +3992,26 @@ void Aura::HandleModMechanicImmunity(bool apply, bool Real)
     if(GetId()==42292 || GetId()==59752)
         mechanic=IMMUNE_TO_MOVEMENT_IMPAIRMENT_AND_LOSS_CONTROL_MASK;
 
-    if(apply && GetSpellProto()->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY)
+    // cache values in local vars for prevent access to possible deleted aura data
+    SpellEntry const* spellInfo = GetSpellProto();
+    uint32 misc     = m_modifier.m_miscvalue;
+    Unit*  target   = m_target;
+
+    if(apply && spellInfo->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY)
     {
-        Unit::AuraMap& Auras = m_target->GetAuras();
+        Unit::AuraMap& Auras = target->GetAuras();
         for(Unit::AuraMap::iterator iter = Auras.begin(), next; iter != Auras.end(); iter = next)
         {
             next = iter;
             ++next;
             SpellEntry const *spell = iter->second->GetSpellProto();
             if (!( spell->Attributes & SPELL_ATTR_UNAFFECTED_BY_INVULNERABILITY) && // spells unaffected by invulnerability
-                   spell->Id != GetId())
+                   spell->Id != spellInfo->Id)
             {
                 //check for mechanic mask
                 if(GetSpellMechanicMask(spell, iter->second->GetEffIndex()) & mechanic)
                 {
-                    m_target->RemoveAurasDueToSpell(spell->Id);
+                    target->RemoveAurasDueToSpell(spell->Id);
                     if(Auras.empty())
                         break;
                     else
@@ -4006,19 +4021,19 @@ void Aura::HandleModMechanicImmunity(bool apply, bool Real)
         }
     }
 
-    m_target->ApplySpellImmune(GetId(),IMMUNITY_MECHANIC,m_modifier.m_miscvalue,apply);
+    target->ApplySpellImmune(spellInfo->Id,IMMUNITY_MECHANIC,misc,apply);
 
     // Bestial Wrath
-    if ( GetSpellProto()->SpellFamilyName == SPELLFAMILY_HUNTER && GetSpellProto()->SpellIconID == 1680)
+    if (spellInfo->SpellFamilyName == SPELLFAMILY_HUNTER && spellInfo->SpellIconID == 1680)
     {
         // The Beast Within cast on owner if talent present
-        if ( Unit* owner = m_target->GetOwner() )
+        if (Unit* owner = target->GetOwner())
         {
             // Search talent
-            Unit::AuraList const& m_dummyAuras = owner->GetAurasByType(SPELL_AURA_DUMMY);
-            for(Unit::AuraList::const_iterator i = m_dummyAuras.begin(); i != m_dummyAuras.end(); ++i)
+            Unit::AuraList const& dummyAuras = owner->GetAurasByType(SPELL_AURA_DUMMY);
+            for(Unit::AuraList::const_iterator i = dummyAuras.begin(); i != dummyAuras.end(); ++i)
             {
-                if ( (*i)->GetSpellProto()->SpellIconID == 2229 )
+                if ((*i)->GetSpellProto()->SpellIconID == 2229)
                 {
                     if (apply)
                         owner->CastSpell(owner, 34471, true, 0, this);
@@ -4031,27 +4046,27 @@ void Aura::HandleModMechanicImmunity(bool apply, bool Real)
     }
 
     // The Beast Within and Bestial Wrath - immunity
-    if(GetId() == 19574 || GetId() == 34471)
+    if (spellInfo->Id == 19574 || spellInfo->Id == 34471)
     {
-        if(apply)
+        if (apply)
         {
-            m_target->CastSpell(m_target,24395,true);
-            m_target->CastSpell(m_target,24396,true);
-            m_target->CastSpell(m_target,24397,true);
-            m_target->CastSpell(m_target,26592,true);
+            target->CastSpell(target,24395,true);
+            target->CastSpell(target,24396,true);
+            target->CastSpell(target,24397,true);
+            target->CastSpell(target,26592,true);
         }
         else
         {
-            m_target->RemoveAurasDueToSpell(24395);
-            m_target->RemoveAurasDueToSpell(24396);
-            m_target->RemoveAurasDueToSpell(24397);
-            m_target->RemoveAurasDueToSpell(26592);
+            target->RemoveAurasDueToSpell(24395);
+            target->RemoveAurasDueToSpell(24396);
+            target->RemoveAurasDueToSpell(24397);
+            target->RemoveAurasDueToSpell(26592);
         }
     }
 }
 
 //this method is called whenever we add / remove aura which gives m_target some imunity to some spell effect
-void Aura::HandleAuraModEffectImmunity(bool apply, bool Real)
+void Aura::HandleAuraModEffectImmunity(bool apply, bool /*Real*/)
 {
     // when removing flag aura, handle flag drop
     if( !apply && m_target->GetTypeId() == TYPEID_PLAYER
@@ -4132,7 +4147,7 @@ void Aura::HandleAuraModSchoolImmunity(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModDmgImmunity(bool apply, bool Real)
+void Aura::HandleAuraModDmgImmunity(bool apply, bool /*Real*/)
 {
     m_target->ApplySpellImmune(GetId(),IMMUNITY_DAMAGE,m_modifier.m_miscvalue,apply);
 }
@@ -4164,7 +4179,7 @@ void Aura::HandleAuraProcTriggerSpell(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModStalked(bool apply, bool Real)
+void Aura::HandleAuraModStalked(bool apply, bool /*Real*/)
 {
     // used by spells: Hunter's Mark, Mind Vision, Syndicate Tracker (MURP) DND
     if(apply)
@@ -4177,7 +4192,7 @@ void Aura::HandleAuraModStalked(bool apply, bool Real)
 /***                   PERIODIC                        ***/
 /*********************************************************/
 
-void Aura::HandlePeriodicTriggerSpell(bool apply, bool Real)
+void Aura::HandlePeriodicTriggerSpell(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
     if (m_spellProto->Id == 66 && !apply)
@@ -4187,7 +4202,7 @@ void Aura::HandlePeriodicTriggerSpell(bool apply, bool Real)
     }
 }
 
-void Aura::HandlePeriodicTriggerSpellWithValue(bool apply, bool Real)
+void Aura::HandlePeriodicTriggerSpellWithValue(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
@@ -4206,7 +4221,7 @@ void Aura::HandlePeriodicEnergize(bool apply, bool Real)
         m_modifier.m_amount = m_target->GetMaxPower(POWER_MANA) * 25 / 10000;
 }
 
-void Aura::HandleAuraPowerBurn(bool apply, bool Real)
+void Aura::HandleAuraPowerBurn(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
@@ -4251,7 +4266,7 @@ void Aura::HandleAuraPeriodicDummy(bool apply, bool Real)
     m_isPeriodic = apply;
 }
 
-void Aura::HandlePeriodicHeal(bool apply, bool Real)
+void Aura::HandlePeriodicHeal(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
@@ -4364,7 +4379,7 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
                     //3 points: ${($m1+$b1*3+0.03*$AP)*6} damage over 12 secs
                     //4 points: ${($m1+$b1*4+0.03428571*$AP)*7} damage over 14 secs
                     //5 points: ${($m1+$b1*5+0.0375*$AP)*8} damage over 16 secs
-                    float AP_per_combo[] = {0, 0.015f, 0.024, 0.03, 0.03428571, 0.0375};
+                    float AP_per_combo[6] = {0.0f, 0.015f, 0.024f, 0.03f, 0.03428571f, 0.0375f};
                     uint8 cp = ((Player*)caster)->GetComboPoints();
                     if (cp > 5) cp = 5;
                     m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * AP_per_combo[cp]);
@@ -4417,22 +4432,22 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
     }
 }
 
-void Aura::HandlePeriodicDamagePCT(bool apply, bool Real)
+void Aura::HandlePeriodicDamagePCT(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
 
-void Aura::HandlePeriodicLeech(bool apply, bool Real)
+void Aura::HandlePeriodicLeech(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
 
-void Aura::HandlePeriodicManaLeech(bool apply, bool Real)
+void Aura::HandlePeriodicManaLeech(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
 
-void Aura::HandlePeriodicHealthFunnel(bool apply, bool Real)
+void Aura::HandlePeriodicHealthFunnel(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
@@ -4445,7 +4460,7 @@ void Aura::HandlePeriodicHealthFunnel(bool apply, bool Real)
 /***        RESISTANCE        ***/
 /********************************/
 
-void Aura::HandleAuraModResistanceExclusive(bool apply, bool Real)
+void Aura::HandleAuraModResistanceExclusive(bool apply, bool /*Real*/)
 {
     for(int8 x = SPELL_SCHOOL_NORMAL; x < MAX_SPELL_SCHOOL;x++)
     {
@@ -4458,7 +4473,7 @@ void Aura::HandleAuraModResistanceExclusive(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModResistance(bool apply, bool Real)
+void Aura::HandleAuraModResistance(bool apply, bool /*Real*/)
 {
     for(int8 x = SPELL_SCHOOL_NORMAL; x < MAX_SPELL_SCHOOL;x++)
     {
@@ -4471,7 +4486,7 @@ void Aura::HandleAuraModResistance(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModBaseResistancePCT(bool apply, bool Real)
+void Aura::HandleAuraModBaseResistancePCT(bool apply, bool /*Real*/)
 {
     // only players have base stats
     if(m_target->GetTypeId() != TYPEID_PLAYER)
@@ -4490,7 +4505,7 @@ void Aura::HandleAuraModBaseResistancePCT(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModResistancePercent(bool apply, bool Real)
+void Aura::HandleModResistancePercent(bool apply, bool /*Real*/)
 {
     for(int8 i = SPELL_SCHOOL_NORMAL; i < MAX_SPELL_SCHOOL; i++)
     {
@@ -4506,7 +4521,7 @@ void Aura::HandleModResistancePercent(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModBaseResistance(bool apply, bool Real)
+void Aura::HandleModBaseResistance(bool apply, bool /*Real*/)
 {
     // only players have base stats
     if(m_target->GetTypeId() != TYPEID_PLAYER)
@@ -4527,7 +4542,7 @@ void Aura::HandleModBaseResistance(bool apply, bool Real)
 /***           STAT           ***/
 /********************************/
 
-void Aura::HandleAuraModStat(bool apply, bool Real)
+void Aura::HandleAuraModStat(bool apply, bool /*Real*/)
 {
     if (m_modifier.m_miscvalue < -2 || m_modifier.m_miscvalue > 4)
     {
@@ -4548,7 +4563,7 @@ void Aura::HandleAuraModStat(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModPercentStat(bool apply, bool Real)
+void Aura::HandleModPercentStat(bool apply, bool /*Real*/)
 {
     if (m_modifier.m_miscvalue < -1 || m_modifier.m_miscvalue > 4)
     {
@@ -4567,7 +4582,7 @@ void Aura::HandleModPercentStat(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModSpellDamagePercentFromStat(bool /*apply*/, bool Real)
+void Aura::HandleModSpellDamagePercentFromStat(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4578,7 +4593,7 @@ void Aura::HandleModSpellDamagePercentFromStat(bool /*apply*/, bool Real)
     ((Player*)m_target)->UpdateSpellDamageAndHealingBonus();
 }
 
-void Aura::HandleModSpellHealingPercentFromStat(bool /*apply*/, bool Real)
+void Aura::HandleModSpellHealingPercentFromStat(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4596,7 +4611,7 @@ void Aura::HandleAuraModDispelResist(bool apply, bool Real)
         m_target->CastSpell(m_target,44416,true,NULL,this,GetCasterGUID());
 }
 
-void Aura::HandleModSpellDamagePercentFromAttackPower(bool /*apply*/, bool Real)
+void Aura::HandleModSpellDamagePercentFromAttackPower(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4607,7 +4622,7 @@ void Aura::HandleModSpellDamagePercentFromAttackPower(bool /*apply*/, bool Real)
     ((Player*)m_target)->UpdateSpellDamageAndHealingBonus();
 }
 
-void Aura::HandleModSpellHealingPercentFromAttackPower(bool /*apply*/, bool Real)
+void Aura::HandleModSpellHealingPercentFromAttackPower(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4616,7 +4631,7 @@ void Aura::HandleModSpellHealingPercentFromAttackPower(bool /*apply*/, bool Real
     ((Player*)m_target)->UpdateSpellDamageAndHealingBonus();
 }
 
-void Aura::HandleModHealingDone(bool /*apply*/, bool Real)
+void Aura::HandleModHealingDone(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4625,7 +4640,7 @@ void Aura::HandleModHealingDone(bool /*apply*/, bool Real)
     ((Player*)m_target)->UpdateSpellDamageAndHealingBonus();
 }
 
-void Aura::HandleModTotalPercentStat(bool apply, bool Real)
+void Aura::HandleModTotalPercentStat(bool apply, bool /*Real*/)
 {
     if (m_modifier.m_miscvalue < -1 || m_modifier.m_miscvalue > 4)
     {
@@ -4656,7 +4671,7 @@ void Aura::HandleModTotalPercentStat(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModResistenceOfStatPercent(bool /*apply*/, bool Real)
+void Aura::HandleAuraModResistenceOfStatPercent(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -4676,12 +4691,12 @@ void Aura::HandleAuraModResistenceOfStatPercent(bool /*apply*/, bool Real)
 /********************************/
 /***      HEAL & ENERGIZE     ***/
 /********************************/
-void Aura::HandleAuraModTotalHealthPercentRegen(bool apply, bool Real)
+void Aura::HandleAuraModTotalHealthPercentRegen(bool apply, bool /*Real*/)
 {
     m_isPeriodic = apply;
 }
 
-void Aura::HandleAuraModTotalManaPercentRegen(bool apply, bool Real)
+void Aura::HandleAuraModTotalManaPercentRegen(bool apply, bool /*Real*/)
 {
     if(m_modifier.periodictime == 0)
         m_modifier.periodictime = 1000;
@@ -4690,7 +4705,7 @@ void Aura::HandleAuraModTotalManaPercentRegen(bool apply, bool Real)
     m_isPeriodic = apply;
 }
 
-void Aura::HandleModRegen(bool apply, bool Real)            // eating
+void Aura::HandleModRegen(bool apply, bool /*Real*/)        // eating
 {
     if(m_modifier.periodictime == 0)
         m_modifier.periodictime = 5000;
@@ -4749,7 +4764,7 @@ void Aura::HandleModManaRegen(bool /*apply*/, bool Real)
     ((Player*)m_target)->UpdateManaRegen();
 }
 
-void Aura::HandleComprehendLanguage(bool apply, bool Real)
+void Aura::HandleComprehendLanguage(bool apply, bool /*Real*/)
 {
     if(apply)
         m_target->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_COMPREHEND_LANG);
@@ -4792,7 +4807,7 @@ void Aura::HandleAuraModIncreaseHealth(bool apply, bool Real)
     m_target->HandleStatModifier(UNIT_MOD_HEALTH, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
-void  Aura::HandleAuraModIncreaseMaxHealth(bool apply, bool Real)
+void  Aura::HandleAuraModIncreaseMaxHealth(bool apply, bool /*Real*/)
 {
     uint32 oldhealth = m_target->GetHealth();
     double healthPercentage = (double)oldhealth / (double)m_target->GetMaxHealth();
@@ -4810,7 +4825,7 @@ void  Aura::HandleAuraModIncreaseMaxHealth(bool apply, bool Real)
     }
 }
 
-void Aura::HandleAuraModIncreaseEnergy(bool apply, bool Real)
+void Aura::HandleAuraModIncreaseEnergy(bool apply, bool /*Real*/)
 {
     Powers powerType = m_target->getPowerType();
     if(int32(powerType) != m_modifier.m_miscvalue)
@@ -4846,7 +4861,7 @@ void Aura::HandleAuraIncreaseBaseHealthPercent(bool apply, bool /*Real*/)
 /***          FIGHT           ***/
 /********************************/
 
-void Aura::HandleAuraModParryPercent(bool /*apply*/, bool Real)
+void Aura::HandleAuraModParryPercent(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -4854,7 +4869,7 @@ void Aura::HandleAuraModParryPercent(bool /*apply*/, bool Real)
     ((Player*)m_target)->UpdateParryPercentage();
 }
 
-void Aura::HandleAuraModDodgePercent(bool /*apply*/, bool Real)
+void Aura::HandleAuraModDodgePercent(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -4863,7 +4878,7 @@ void Aura::HandleAuraModDodgePercent(bool /*apply*/, bool Real)
     //sLog.outError("BONUS DODGE CHANCE: + %f", float(m_modifier.m_amount));
 }
 
-void Aura::HandleAuraModBlockPercent(bool /*apply*/, bool Real)
+void Aura::HandleAuraModBlockPercent(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId()!=TYPEID_PLAYER)
         return;
@@ -4913,7 +4928,7 @@ void Aura::HandleAuraModCritPercent(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModHitChance(bool apply, bool Real)
+void Aura::HandleModHitChance(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() == TYPEID_PLAYER)
     {
@@ -4927,7 +4942,7 @@ void Aura::HandleModHitChance(bool apply, bool Real)
     }
 }
 
-void Aura::HandleModSpellHitChance(bool apply, bool Real)
+void Aura::HandleModSpellHitChance(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() == TYPEID_PLAYER)
     {
@@ -4973,19 +4988,19 @@ void Aura::HandleModSpellCritChanceShool(bool /*apply*/, bool Real)
 /***         ATTACK SPEED     ***/
 /********************************/
 
-void Aura::HandleModCastingSpeed(bool apply, bool Real)
+void Aura::HandleModCastingSpeed(bool apply, bool /*Real*/)
 {
     m_target->ApplyCastTimePercentMod(m_modifier.m_amount,apply);
 }
 
-void Aura::HandleModMeleeRangedSpeedPct(bool apply, bool Real)
+void Aura::HandleModMeleeRangedSpeedPct(bool apply, bool /*Real*/)
 {
     m_target->ApplyAttackTimePercentMod(BASE_ATTACK,m_modifier.m_amount,apply);
     m_target->ApplyAttackTimePercentMod(OFF_ATTACK,m_modifier.m_amount,apply);
     m_target->ApplyAttackTimePercentMod(RANGED_ATTACK, m_modifier.m_amount, apply);
 }
 
-void Aura::HandleModCombatSpeedPct(bool apply, bool Real)
+void Aura::HandleModCombatSpeedPct(bool apply, bool /*Real*/)
 {
     m_target->ApplyCastTimePercentMod(m_modifier.m_amount,apply);
     m_target->ApplyAttackTimePercentMod(BASE_ATTACK,m_modifier.m_amount,apply);
@@ -4993,7 +5008,7 @@ void Aura::HandleModCombatSpeedPct(bool apply, bool Real)
     m_target->ApplyAttackTimePercentMod(RANGED_ATTACK, m_modifier.m_amount, apply);
 }
 
-void Aura::HandleModAttackSpeed(bool apply, bool Real)
+void Aura::HandleModAttackSpeed(bool apply, bool /*Real*/)
 {
     if(!m_target->isAlive() )
         return;
@@ -5001,19 +5016,19 @@ void Aura::HandleModAttackSpeed(bool apply, bool Real)
     m_target->ApplyAttackTimePercentMod(BASE_ATTACK,m_modifier.m_amount,apply);
 }
 
-void Aura::HandleHaste(bool apply, bool Real)
+void Aura::HandleHaste(bool apply, bool /*Real*/)
 {
     m_target->ApplyAttackTimePercentMod(BASE_ATTACK,  m_modifier.m_amount,apply);
     m_target->ApplyAttackTimePercentMod(OFF_ATTACK,   m_modifier.m_amount,apply);
     m_target->ApplyAttackTimePercentMod(RANGED_ATTACK,m_modifier.m_amount,apply);
 }
 
-void Aura::HandleAuraModRangedHaste(bool apply, bool Real)
+void Aura::HandleAuraModRangedHaste(bool apply, bool /*Real*/)
 {
     m_target->ApplyAttackTimePercentMod(RANGED_ATTACK, m_modifier.m_amount, apply);
 }
 
-void Aura::HandleRangedAmmoHaste(bool apply, bool Real)
+void Aura::HandleRangedAmmoHaste(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -5024,12 +5039,12 @@ void Aura::HandleRangedAmmoHaste(bool apply, bool Real)
 /***        ATTACK POWER      ***/
 /********************************/
 
-void Aura::HandleAuraModAttackPower(bool apply, bool Real)
+void Aura::HandleAuraModAttackPower(bool apply, bool /*Real*/)
 {
     m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
-void Aura::HandleAuraModRangedAttackPower(bool apply, bool Real)
+void Aura::HandleAuraModRangedAttackPower(bool apply, bool /*Real*/)
 {
     if((m_target->getClassMask() & CLASSMASK_WAND_USERS)!=0)
         return;
@@ -5037,13 +5052,13 @@ void Aura::HandleAuraModRangedAttackPower(bool apply, bool Real)
     m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
-void Aura::HandleAuraModAttackPowerPercent(bool apply, bool Real)
+void Aura::HandleAuraModAttackPowerPercent(bool apply, bool /*Real*/)
 {
     //UNIT_FIELD_ATTACK_POWER_MULTIPLIER = multiplier - 1
     m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER, TOTAL_PCT, float(m_modifier.m_amount), apply);
 }
 
-void Aura::HandleAuraModRangedAttackPowerPercent(bool apply, bool Real)
+void Aura::HandleAuraModRangedAttackPowerPercent(bool apply, bool /*Real*/)
 {
     if((m_target->getClassMask() & CLASSMASK_WAND_USERS)!=0)
         return;
@@ -5052,7 +5067,7 @@ void Aura::HandleAuraModRangedAttackPowerPercent(bool apply, bool Real)
     m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_PCT, float(m_modifier.m_amount), apply);
 }
 
-void Aura::HandleAuraModRangedAttackPowerOfStatPercent(bool apply, bool Real)
+void Aura::HandleAuraModRangedAttackPowerOfStatPercent(bool /*apply*/, bool Real)
 {
     // spells required only Real aura add/remove
     if(!Real)
@@ -5063,7 +5078,7 @@ void Aura::HandleAuraModRangedAttackPowerOfStatPercent(bool apply, bool Real)
         ((Player*)m_target)->UpdateAttackPowerAndDamage(true);
 }
 
-void Aura::HandleAuraModAttackPowerOfStatPercent(bool apply, bool Real)
+void Aura::HandleAuraModAttackPowerOfStatPercent(bool /*apply*/, bool Real)
 {
     // spells required only Real aura add/remove
     if(!Real)
@@ -5255,7 +5270,7 @@ void Aura::HandleModPowerCost(bool apply, bool Real)
             m_target->ApplyModInt32Value(UNIT_FIELD_POWER_COST_MODIFIER+i,m_modifier.m_amount,apply);
 }
 
-void Aura::HandleNoReagentUseAura(bool Apply, bool Real)
+void Aura::HandleNoReagentUseAura(bool /*Apply*/, bool Real)
 {
     // spells required only Real aura add/remove
     if(!Real)
@@ -5423,7 +5438,7 @@ void Aura::HandleShapeshiftBoosts(bool apply)
     m_target->SetHealth(uint32(ceil((double)m_target->GetMaxHealth() * healthPercentage)));*/
 }
 
-void Aura::HandleAuraEmpathy(bool apply, bool Real)
+void Aura::HandleAuraEmpathy(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_UNIT)
         return;
@@ -5433,7 +5448,7 @@ void Aura::HandleAuraEmpathy(bool apply, bool Real)
         m_target->ApplyModUInt32Value(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_SPECIALINFO, apply);
 }
 
-void Aura::HandleAuraUntrackable(bool apply, bool Real)
+void Aura::HandleAuraUntrackable(bool apply, bool /*Real*/)
 {
     if(apply)
         m_target->SetByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_UNTRACKABLE);
@@ -5441,7 +5456,7 @@ void Aura::HandleAuraUntrackable(bool apply, bool Real)
         m_target->RemoveByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_UNTRACKABLE);
 }
 
-void Aura::HandleAuraModPacify(bool apply, bool Real)
+void Aura::HandleAuraModPacify(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -5458,7 +5473,7 @@ void Aura::HandleAuraModPacifyAndSilence(bool apply, bool Real)
     HandleAuraModSilence(apply,Real);
 }
 
-void Aura::HandleAuraGhost(bool apply, bool Real)
+void Aura::HandleAuraGhost(bool apply, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -5528,7 +5543,7 @@ void Aura::HandleForceMoveForward(bool apply, bool Real)
         m_target->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_FORCE_MOVE);
 }
 
-void Aura::HandleAuraModExpertise(bool /*apply*/, bool Real)
+void Aura::HandleAuraModExpertise(bool /*apply*/, bool /*Real*/)
 {
     if(m_target->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -5553,7 +5568,7 @@ void Aura::HandleModTargetResistance(bool apply, bool Real)
         m_target->ApplyModInt32Value(PLAYER_FIELD_MOD_TARGET_RESISTANCE,m_modifier.m_amount, apply);
 }
 
-void Aura::HandleShieldBlockValue(bool apply, bool Real)
+void Aura::HandleShieldBlockValue(bool apply, bool /*Real*/)
 {
     BaseModType modType = FLAT_MOD;
     if(m_modifier.m_auraname == SPELL_AURA_MOD_SHIELD_BLOCKVALUE_PCT)
@@ -5799,6 +5814,8 @@ void Aura::PeriodicTick()
             sLog.outDetail("PeriodicTick: %u (TypeId: %u) attacked %u (TypeId: %u) for %u dmg inflicted by %u abs is %u",
                 GUID_LOPART(GetCasterGUID()), GuidHigh2TypeId(GUID_HIPART(GetCasterGUID())), m_target->GetGUIDLow(), m_target->GetTypeId(), pdamage, GetId(),absorb);
 
+            pCaster->DealDamageMods(m_target,pdamage,&absorb);
+
             WorldPacket data(SMSG_PERIODICAURALOG, (21+16));// we guess size
             data.append(m_target->GetPackGUID());
             data.appendPackGUID(GetCasterGUID());
@@ -5952,14 +5969,9 @@ void Aura::PeriodicTick()
                 if( BattleGround *bg = ((Player*)pCaster)->GetBattleGround() )
                     bg->UpdatePlayerScore(((Player*)pCaster), SCORE_HEALING_DONE, gain);
 
-            //Do check before because m_modifier.auraName can be invalidate by DealDamage.
-            bool procSpell = (m_modifier.m_auraname == SPELL_AURA_PERIODIC_HEAL && m_target != pCaster);
-
             m_target->getHostilRefManager().threatAssist(pCaster, float(gain) * 0.5f, GetSpellProto());
 
-            Unit* target = m_target;                        // aura can be deleted in DealDamage
             SpellEntry const* spellProto = GetSpellProto();
-            bool haveCastItem = GetCastItemGUID()!=0;
 
             // heal for caster damage
             if(m_target!=pCaster && spellProto->SpellVisual[0]==163)
@@ -5982,15 +5994,18 @@ void Aura::PeriodicTick()
                 }
                 else
                 {
-                    pCaster->SendSpellNonMeleeDamageLog(pCaster, GetId(), gain, GetSpellSchoolMask(GetSpellProto()), 0, 0, false, 0, false);
+                    uint32 damage = gain;
+                    uint32 absorb = 0;
+                    pCaster->DealDamageMods(pCaster,damage,&absorb);
+                    pCaster->SendSpellNonMeleeDamageLog(pCaster, GetId(), damage, GetSpellSchoolMask(GetSpellProto()), absorb, 0, false, 0, false);
 
                     CleanDamage cleanDamage =  CleanDamage(0, BASE_ATTACK, MELEE_HIT_NORMAL );
-                    pCaster->DealDamage(pCaster, gain, &cleanDamage, NODAMAGE, GetSpellSchoolMask(GetSpellProto()), GetSpellProto(), true);
+                    pCaster->DealDamage(pCaster, damage, &cleanDamage, NODAMAGE, GetSpellSchoolMask(GetSpellProto()), GetSpellProto(), true);
                 }
             }
 
-            uint32 procAttacker = PROC_FLAG_ON_DO_PERIODIC;//   | PROC_FLAG_SUCCESSFUL_HEAL;
-            uint32 procVictim   = 0;//ROC_FLAG_ON_TAKE_PERIODIC | PROC_FLAG_TAKEN_HEAL;
+//            uint32 procAttacker = PROC_FLAG_ON_DO_PERIODIC;//   | PROC_FLAG_SUCCESSFUL_HEAL;
+//            uint32 procVictim   = 0;//ROC_FLAG_ON_TAKE_PERIODIC | PROC_FLAG_TAKEN_HEAL;
             // ignore item heals
 //            if(procSpell && !haveCastItem)
 //                pCaster->ProcDamageAndSpell(target, procAttacker, procVictim, PROC_EX_NORMAL_HIT, pdamage, BASE_ATTACK, spellProto);
@@ -6167,6 +6182,9 @@ void Aura::PeriodicTick()
             //maybe has to be sent different to client, but not by SMSG_PERIODICAURALOG
             SpellNonMeleeDamage damageInfo(pCaster, m_target, spellProto->Id, spellProto->SchoolMask);
             pCaster->CalculateSpellDamage(&damageInfo, gain, spellProto);
+
+            pCaster->DealDamageMods(damageInfo.target,damageInfo.damage,&damageInfo.absorb);
+
             pCaster->SendSpellNonMeleeDamageLog(&damageInfo);
 
             // Set trigger flag
@@ -6684,19 +6702,35 @@ void Aura::HandleArenaPreparation(bool apply, bool Real)
         m_target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PREPARATION);
 }
 
+/**
+ * Such auras are applied from a caster(=player) to a vehicle.
+ * This has been verified using spell #49256
+ */
 void Aura::HandleAuraControlVehicle(bool apply, bool Real)
 {
     if(!Real)
         return;
 
-    if(m_target->GetTypeId() != TYPEID_PLAYER)
+    Unit *player = GetCaster();
+    Vehicle *vehicle = dynamic_cast<Vehicle*>(m_target);
+    if(!player || player->GetTypeId()!=TYPEID_PLAYER || !vehicle)
         return;
 
-    if(Pet *pet = m_target->GetPet())
-        pet->Remove(PET_SAVE_AS_CURRENT);
+    if (apply)
+    {
+        if(Pet *pet = player->GetPet())
+            pet->Remove(PET_SAVE_AS_CURRENT);
+        ((Player*)player)->EnterVehicle(vehicle);
+    }
+    else
+    {
+        SpellEntry const *spell = GetSpellProto();
 
-    WorldPacket data(SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA, 0);
-    ((Player*)m_target)->GetSession()->SendPacket(&data);
+        // some SPELL_AURA_CONTROL_VEHICLE auras have a dummy effect on the player - remove them
+        player->RemoveAurasDueToSpell(spell->Id);
+
+        ((Player*)player)->ExitVehicle(vehicle);
+    }
 }
 
 void Aura::HandleAuraConvertRune(bool apply, bool Real)
@@ -6811,4 +6845,13 @@ void Aura::UnregisterSingleCastAura()
         }
         m_isSingleTargetAura = false;
     }
+}
+
+void Aura::HandleAuraSafeFall( bool Apply, bool Real )
+{
+    // implemented in WorldSession::HandleMovementOpcodes
+
+    // only special case
+    if(Apply && Real && GetId()==32474 && m_target->GetTypeId()==TYPEID_PLAYER)
+        ((Player*)m_target)->ActivateTaxiPathTo(506,GetId());
 }

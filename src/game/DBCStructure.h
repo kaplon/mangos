@@ -1480,10 +1480,9 @@ struct TalentEntry
                                                             // 14-15 not used
     uint32    DependsOnRank;                                // 16
                                                             // 17-18 not used
-    //uint32  unk1;                                         // 19, 0 or 1
+    //uint32  needAddInSpellBook;                           // 19  also need disable higest ranks on reset talent tree
     //uint32  unk2;                                         // 20, all 0
-    //uint32  unkFlags1;                                    // 21, related to hunter pet talents
-    //uint32  unkFlags2;                                    // 22, related to hunter pet talents
+    //uint64  allowForPet;                                  // 21 its a 64 bit mask for pet 1<<m_categoryEnumID in CreatureFamily.dbc
 };
 
 struct TalentTabEntry
@@ -1506,7 +1505,7 @@ struct TaxiNodesEntry
     float     x;                                            // 2        m_x
     float     y;                                            // 3        m_y
     float     z;                                            // 4        m_z
-    //char*     name[16];                                   // 5-21     m_Name_lang
+    char*     name[16];                                     // 5-21     m_Name_lang
                                                             // 22 string flags
     uint32    MountCreatureID[2];                           // 23-24    m_MountCreatureID[2]
 };
@@ -1641,6 +1640,18 @@ struct WorldMapAreaEntry
     // int32   dungeonMap_id;                               // 9 pointer to DungeonMap.dbc (owerride x1,x2,y1,y2 coordinates)
 };
 
+#define MAX_WORLD_MAP_OVERLAY_AREA_IDX 4
+
+struct WorldMapOverlayEntry
+{
+    uint32    ID;                                           // 0
+    //uint32    worldMapAreaId;                             // 1 idx in WorldMapArea.dbc
+    uint32    areatableID[MAX_WORLD_MAP_OVERLAY_AREA_IDX];  // 2-5
+                                                            // 6-7 always 0, possible part of areatableID[]
+    //char* internal_name                                   // 8
+                                                            // 9-16 some ints
+};
+
 struct WorldSafeLocsEntry
 {
     uint32    ID;                                           // 0
@@ -1650,12 +1661,6 @@ struct WorldSafeLocsEntry
     float     z;                                            // 4
     //char*   name[16]                                      // 5-20 name, unused
                                                             // 21 name flags, unused
-};
-
-struct WorldMapOverlayEntry
-{
-    uint32    ID;                                           // 0
-    uint32    areatableID[4];                               // 2-5
 };
 
 // GCC have alternative #pragma pack() syntax and old gcc version not support pack(pop), also any gcc version not support it at some platform

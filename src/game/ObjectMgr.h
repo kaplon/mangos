@@ -95,6 +95,15 @@ extern ScriptMapMap sSpellScripts;
 extern ScriptMapMap sGameObjectScripts;
 extern ScriptMapMap sEventScripts;
 
+struct SpellClickInfo
+{
+    uint32 spellId;
+    uint32 questId;
+    uint8 castFlags;
+};
+
+typedef std::multimap<uint32, SpellClickInfo> SpellClickInfoMap;
+
 struct AreaTrigger
 {
     uint8  requiredLevel;
@@ -389,7 +398,7 @@ class ObjectMgr
 
         uint32 GetNearestTaxiNode( float x, float y, float z, uint32 mapid, uint32 team );
         void GetTaxiPath( uint32 source, uint32 destination, uint32 &path, uint32 &cost);
-        uint16 GetTaxiMount( uint32 id, uint32 team );
+        uint16 GetTaxiMount( uint32 id, uint32 team, bool allowed_alt_team = false);
         void GetTaxiPathNodes( uint32 path, Path &pathnodes, std::vector<uint32>& mapIds );
         void GetTransportPathNodes( uint32 path, TransportPath &pathnodes );
 
@@ -533,6 +542,9 @@ class ObjectMgr
 
         void LoadReputationOnKill();
         void LoadPointsOfInterest();
+
+        SpellClickInfoMap mSpellClickInfoMap;
+        void LoadNPCSpellClickSpells();
 
         void LoadWeatherZoneChances();
         void LoadGameTele();
@@ -695,8 +707,6 @@ class ObjectMgr
 
         int GetIndexForLocale(LocaleConstant loc);
         LocaleConstant GetLocaleForIndex(int i);
-        // guild bank tabs
-        uint32 GetGuildBankTabPrice(uint8 Index) const { return Index < GUILD_BANK_MAX_TABS ? mGuildBankTabPrice[Index] : 0; }
 
         uint16 GetConditionId(ConditionType condition, uint32 value1, uint32 value2);
         bool IsPlayerMeetToCondition(Player const* player, uint16 condition_id) const
@@ -862,9 +872,6 @@ class ObjectMgr
         PointOfInterestLocaleMap mPointOfInterestLocaleMap;
         RespawnTimes mCreatureRespawnTimes;
         RespawnTimes mGORespawnTimes;
-
-        typedef std::vector<uint32> GuildBankTabPriceMap;
-        GuildBankTabPriceMap mGuildBankTabPrice;
 
         // Storage for Conditions. First element (index 0) is reserved for zero-condition (nothing required)
         typedef std::vector<PlayerCondition> ConditionStore;
