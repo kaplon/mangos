@@ -146,7 +146,7 @@ inline bool IsLootCraftingSpell(SpellEntry const *spellInfo)
 
 int32 CompareAuraRanks(uint32 spellId_1, uint32 effIndex_1, uint32 spellId_2, uint32 effIndex_2);
 bool IsSingleFromSpellSpecificPerCaster(SpellSpecific spellSpec1,SpellSpecific spellSpec2);
-bool IsSingleFromSpellSpecificRanksPerTarget(SpellSpecific spellId_spec, SpellSpecific i_spellId_spec);
+bool IsSingleFromSpellSpecificRanksPerTarget(SpellEntry const *spellInfo_1, SpellEntry const *spellInfo_2);
 bool IsPassiveSpell(uint32 spellId);
 
 inline bool IsPassiveSpellStackableWithRanks(SpellEntry const* spellProto)

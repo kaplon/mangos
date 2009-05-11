@@ -256,17 +256,27 @@ bool IsSingleFromSpellSpecificPerCaster(SpellSpecific spellSpec1,SpellSpecific s
     }
 }
 
-bool IsSingleFromSpellSpecificRanksPerTarget(SpellSpecific spellId_spec, SpellSpecific i_spellId_spec)
+bool IsSingleFromSpellSpecificRanksPerTarget(SpellEntry const *spellInfo_1, SpellEntry const *spellInfo_2)
 {
-    switch(spellId_spec)
+    if(!spellInfo_1 || !spellInfo_2)
+        return false;
+
+    uint32 aur_1 = spellInfo_1->EffectApplyAuraName[0];
+    uint32 aur_2 = spellInfo_2->EffectApplyAuraName[0];
+
+    if(!aur_1 ||!aur_2)
+        return false;
+
+    switch(aur_1)
     {
-        case SPELL_BLESSING:
-        case SPELL_AURA:
-        case SPELL_CURSE:
-            return spellId_spec==i_spellId_spec;
+        case SPELL_AURA_MOD_ATTACK_POWER:
+            if(aur_1==aur_2)
+                return true;
         default:
             return false;
     }
+
+    return false;    
 }
 
 bool IsPositiveTarget(uint32 targetA, uint32 targetB)
