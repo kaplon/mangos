@@ -3967,6 +3967,13 @@ void Aura::HandleModMechanicImmunity(bool apply, bool /*Real*/)
     if(GetId()==42292 || GetId()==59752)
         mechanic=IMMUNE_TO_MOVEMENT_IMPAIRMENT_AND_LOSS_CONTROL_MASK;
 
+    //Forbearance(right immune mechanic)
+    if (GetId()==25771)
+    {
+        m_modifier.m_miscvalue = 29;
+        m_target->CastSpell(m_target,61987,true);
+    }
+
     // cache values in local vars for prevent access to possible deleted aura data
     SpellEntry const* spellInfo = GetSpellProto();
     uint32 misc     = m_modifier.m_miscvalue;
