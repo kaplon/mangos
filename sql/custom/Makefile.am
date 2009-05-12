@@ -27,10 +27,12 @@ pkgdatadir = $(datadir)/mangos/sql/custom
 pkgdata_DATA = \
         lockpets_pet_levelspell.sql \
         lockpets_spell_chain_fix.sql \
-        rapture_mangos.sql
+        rapture_mangos.sql \
+        wise.sql
 
 ## Additional files to include when running 'make dist'
 EXTRA_DIST = \
         lockpets_pet_levelspell.sql \
         lockpets_spell_chain_fix.sql \
-        rapture_mangos.sql
+        rapture_mangos.sql \
+        wise.sql
