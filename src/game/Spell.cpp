@@ -3711,7 +3711,7 @@ SpellCastResult Spell::CheckCast(bool strict)
     if(Unit *target = m_targets.getUnitTarget())
     {
         // Paladin immunity spells & Avenging wrath
-        if((m_spellInfo->Id == 642 || m_spellInfo->Id == 498 || m_spellInfo->Id == 1022 || m_spellInfo->Id == 5599 || m_spellInfo->Id == 10278) && target->H
+        if((m_spellInfo->Id == 642 || m_spellInfo->Id == 498 || m_spellInfo->Id == 1022 || m_spellInfo->Id == 5599 || m_spellInfo->Id == 10278) && target->HasAura(61987))
             return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW;
     
         // target state requirements (not allowed state), apply to self also
