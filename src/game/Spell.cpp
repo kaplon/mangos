@@ -3548,6 +3548,18 @@ void Spell::TakeReagents()
     if (p_caster->CanNoReagentCast(m_spellInfo))
         return;
 
+    if(m_CastItem)
+    {
+        for(int i=0; i<3; ++i)
+        {
+            if(m_spellInfo->EffectItemType[i] == m_CastItem->GetEntry())
+            {
+                p_caster->DestroyItemCount(m_CastItem->GetEntry(), 1, true);
+                return;
+            }
+        }
+    }
+
     for(uint32 x=0;x<8;x++)
     {
         if(m_spellInfo->Reagent[x] <= 0)
@@ -4362,6 +4374,23 @@ SpellCastResult Spell::CheckCast(bool strict)
                     return SPELL_FAILED_BAD_TARGETS;
                 break;
             }
+            case SPELL_EFFECT_ENCHANT_ITEM:
+            {
+                if(m_spellInfo->EffectItemType[i] && m_targets.getItemTarget())
+                {
+                    if(m_targets.getItemTarget()->IsWeaponVellum() || m_targets.getItemTarget()->IsArmorVellum())
+                    {
+                         ItemPosCountVec dest;
+                         uint8 msg = ((Player*)m_caster)->CanStoreNewItem( NULL_BAG, NULL_SLOT, dest, m_spellInfo->EffectItemType[i], 1 );
+                         if(msg != EQUIP_ERR_OK)
+                         {
+                            ((Player*)m_caster)->SendEquipError( msg, NULL, NULL );
+                            return SPELL_FAILED_DONT_REPORT;
+                         }
+                    }
+                }
+                break;
+            }
             default:break;
         }
     }
@@ -4844,11 +4873,13 @@ SpellCastResult Spell::CheckItems()
 
     Player* p_caster = (Player*)m_caster;
 
+    bool isNoReagentReqCast = m_CastItem ? m_CastItem->GetEntry() == m_spellInfo->EffectItemType[0] : false;
+
     // cast item checks
     if(m_CastItem)
     {
         uint32 itemid = m_CastItem->GetEntry();
-        if( !p_caster->HasItemCount(itemid,1) )
+        if( !p_caster->HasItemCount(itemid,1) && !isNoReagentReqCast)
             return SPELL_FAILED_ITEM_NOT_READY;
 
         ItemPrototype const *proto = m_CastItem->GetProto();
@@ -4921,7 +4952,7 @@ SpellCastResult Spell::CheckItems()
         if(!m_targets.getItemTarget())
             return SPELL_FAILED_ITEM_GONE;
 
-        if(!m_targets.getItemTarget()->IsFitToSpellRequirements(m_spellInfo))
+        if(!m_targets.getItemTarget()->IsFitToSpellRequirements(m_spellInfo) && !isNoReagentReqCast)
             return SPELL_FAILED_EQUIPPED_ITEM_CLASS;
     }
     // if not item target then required item must be equipped
@@ -4953,7 +4984,7 @@ SpellCastResult Spell::CheckItems()
     }
 
     // check reagents (ignore triggered spells with reagents processed by original spell) and special reagent ignore case.
-    if (!m_IsTriggeredSpell && !p_caster->CanNoReagentCast(m_spellInfo))
+    if (!m_IsTriggeredSpell && !p_caster->CanNoReagentCast(m_spellInfo) && !isNoReagentReqCast)
     {
         for(uint32 i=0;i<8;++i)
         {
@@ -5017,7 +5048,7 @@ SpellCastResult Spell::CheckItems()
         else
             TotemCategory -= 1;
     }
-    if(TotemCategory != 0)
+    if(TotemCategory != 0 && !isNoReagentReqCast)
         return SPELL_FAILED_TOTEM_CATEGORY;                 //0x7B
 
     // special checks for spell effects

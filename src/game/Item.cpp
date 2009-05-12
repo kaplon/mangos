@@ -740,6 +740,10 @@ bool Item::IsFitToSpellRequirements(SpellEntry const* spellInfo) const
 {
     ItemPrototype const* proto = GetProto();
 
+    if(spellInfo->Effect[0] == SPELL_EFFECT_ENCHANT_ITEM && ((spellInfo->EquippedItemClass == ITEM_CLASS_ARMOR && IsArmorVellum()) ||
+      (spellInfo->EquippedItemClass == ITEM_CLASS_WEAPON && IsWeaponVellum())))
+        return true;
+
     if (spellInfo->EquippedItemClass != -1)                 // -1 == any item class
     {
         if(spellInfo->EquippedItemClass != int32(proto->Class))
