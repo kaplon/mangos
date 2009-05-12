@@ -5109,8 +5109,10 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
             switch(dummySpell->Id)
             {
                 // Nightfall
+                // 56218 proc from glyph of corruption
                 case 18094:
                 case 18095:
+                case 56218:
                 {
                     target = this;
                     triggered_spell_id = 17941;
