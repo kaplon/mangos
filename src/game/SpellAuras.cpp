@@ -5827,6 +5827,8 @@ void Aura::PeriodicTick()
                         pdamage += (pdamage+1)/2;           // +1 prevent 0.5 damage possible lost at 1..4 ticks
                     // 5..8 ticks have normal tick damage
                 }
+                else if(GetId() == 31803)
+                    pdamage = int32((pCaster->GetTotalAttackPowerValue(BASE_ATTACK) * 15 / 100) + (pCaster->SpellBaseDamageBonus(SPELL_SCHOOL_MASK_HOLY) * 88 / 1000));
             }
             else
                 pdamage = uint32(m_target->GetMaxHealth()*amount/100);
