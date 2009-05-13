@@ -5883,9 +5883,18 @@ void Spell::EffectMomentMove(uint32 i)
             fx = fx2;
             fy = fy2;
             fz = fz2;
-            unitTarget->UpdateGroundPositionZ(fx,fy,fz);
         }
 
+        if(unitTarget->GetTypeId() == TYPEID_PLAYER)
+        {
+            fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,fz,true);
+            if (fabs(fz-oz) > 4.0f)
+            {
+                fx = ox;
+                fy = oy;
+                fz = oz;
+            }
+        }  
         unitTarget->NearTeleportTo(fx, fy, fz, unitTarget->GetOrientation(),unitTarget==m_caster);
     }
 }
