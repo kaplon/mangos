@@ -356,13 +356,31 @@ bool Unit::HasAuraType(AuraType auraType) const
 }
 
 /* Called by DealDamage for auras that have a chance to be dispelled on damage taken. */
-void Unit::RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage)
+void Unit::RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage, Unit *pCaster)
 {
+    if (!pCaster)
+        return;
+
     if(!HasAuraType(auraType))
         return;
 
     // The chance to dispel an aura depends on the damage taken with respect to the casters level.
-    uint32 max_dmg = getLevel() > 8 ? 25 * getLevel() - 150 : 50;
+    uint32 max_dmg = pCaster->getLevel() > 8 ? 25 * getLevel() - 150 : 50;
+
+    // Glyph of Fear and Glyph of Entangling Roots bonus
+    if (pCaster->GetTypeId() == TYPEID_PLAYER)
+    {
+        AuraList const& m_OverrideClassScript = pCaster->GetAurasByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
+        for (AuraList::const_iterator citr = m_OverrideClassScript.begin(); citr != m_OverrideClassScript.end(); ++citr)
+        {
+            if ((*citr)->GetModifier()->m_miscvalue == 7801)
+            {
+                max_dmg = int32(max_dmg * (100.0f + (*citr)->GetModifier()->m_amount) / 100.0f);
+                break;
+            }
+        }
+    }
+
     float chance = float(damage) / max_dmg * 100.0f;
     if (roll_chance_f(chance))
         RemoveSpellsCausingAura(auraType);
@@ -432,10 +450,10 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
         return 0;
     }
     if (!spellProto || !IsAuraAddedBySpell(SPELL_AURA_MOD_FEAR, spellProto->Id))
-        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_FEAR, damage);
+        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_FEAR, damage, this);
     // root type spells do not dispel the root effect
     if (!spellProto || !(spellProto->Mechanic == MECHANIC_ROOT || IsAuraAddedBySpell(SPELL_AURA_MOD_ROOT, spellProto->Id)))
-        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_ROOT, damage);
+        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_ROOT, damage, this);
 
     // no xp,health if type 8 /critters/
     if(pVictim->GetTypeId() != TYPEID_PLAYER && pVictim->GetCreatureType() == CREATURE_TYPE_CRITTER)
