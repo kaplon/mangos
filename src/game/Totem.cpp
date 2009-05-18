@@ -48,9 +48,6 @@ void Totem::Update( uint32 time )
     else
         m_duration -= time;
 
-       if(owner->IsPvP())
-               SetPvP(true);
-
     Creature::Update( time );
 }
 
@@ -136,8 +133,6 @@ void Totem::SetOwner(uint64 guid)
     {
         setFaction(owner->getFaction());
         SetLevel(owner->getLevel());
-               if(owner->IsPvP())
-                  SetPvP(true);
     }
 }
 
