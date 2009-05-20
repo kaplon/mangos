@@ -51,6 +51,7 @@ class UpdateMask;
 class SpellCastTargets;
 class PlayerSocial;
 class Vehicle;
+class OutdoorPvP;
 
 typedef std::deque<Mail*> PlayerMails;
 
@@ -906,6 +907,7 @@ class MANGOS_DLL_SPEC Player : public Unit
 
         void GiveXP(uint32 xp, Unit* victim);
         void GiveLevel(uint32 level);
+
         void InitStatsForLevel(bool reapplyMods = false);
 
         // Played Time Stuff
@@ -1864,6 +1866,14 @@ class MANGOS_DLL_SPEC Player : public Unit
         bool CanCaptureTowerPoint();
 
         /*********************************************************/
+        /***               OUTDOOR PVP SYSTEM                  ***/
+        /*********************************************************/
+
+        OutdoorPvP * GetOutdoorPvP() const;
+        // returns true if the player is in active state for outdoor pvp objective capturing, false otherwise
+        bool IsOutdoorPvPActive();
+
+        /*********************************************************/
         /***                    REST SYSTEM                    ***/
         /*********************************************************/
 
@@ -2283,7 +2293,7 @@ class MANGOS_DLL_SPEC Player : public Unit
         Item* _StoreItem( uint16 pos, Item *pItem, uint32 count, bool clone, bool update );
 
         void UpdateKnownCurrencies(uint32 itemId, bool apply);
-        int32 CalculateReputationGain(uint32 creatureOrQuestLevel, int32 rep, bool for_quest);
+        int32 CalculateReputationGain(uint32 creatureOrQuestLevel, int32 rep, int32 faction, bool for_quest);
         void AdjustQuestReqItemCount( Quest const* pQuest, QuestStatusData& questStatusData );
 
         GridReference<Player> m_gridRef;

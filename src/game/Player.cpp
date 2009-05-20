@@ -52,6 +52,8 @@
 #include "Weather.h"
 #include "BattleGround.h"
 #include "BattleGroundMgr.h"
+#include "OutdoorPvP.h"
+#include "OutdoorPvPMgr.h"
 #include "ArenaTeam.h"
 #include "Chat.h"
 #include "Database/DatabaseImpl.h"
@@ -1424,8 +1426,8 @@ void Player::BuildEnumData( QueryResult * result, WorldPacket * p_data )
 
     *p_data << uint8(getLevel());                           // player level
     // do not use GetMap! it will spawn a new instance since the bound instances are not loaded
-    uint32 zoneId = MapManager::Instance().GetZoneId(GetMapId(), GetPositionX(),GetPositionY(),GetPositionZ());
-    sLog.outDebug("Player::BuildEnumData: m:%u, x:%f, y:%f, z:%f zone:%u", GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), zoneId);
+    uint32 zoneId = fields[10].GetUInt32();
+    sLog.outDebug("Player::BuildEnumData: map:%u, x:%f, y:%f, z:%f zone:%u", GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), zoneId);
     *p_data << uint32(zoneId);
     *p_data << uint32(GetMapId());
 
@@ -1434,7 +1436,7 @@ void Player::BuildEnumData( QueryResult * result, WorldPacket * p_data )
     *p_data << GetPositionZ();
 
     // guild id
-    *p_data << (result ? fields[13].GetUInt32() : 0);
+    *p_data << uint32(fields[14].GetUInt32());
 
     uint32 char_flags = 0;
     if(HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM))
@@ -1445,7 +1447,12 @@ void Player::BuildEnumData( QueryResult * result, WorldPacket * p_data )
         char_flags |= CHARACTER_FLAG_GHOST;
     if(HasAtLoginFlag(AT_LOGIN_RENAME))
         char_flags |= CHARACTER_FLAG_RENAME;
-    if(sWorld.getConfig(CONFIG_DECLINED_NAMES_USED) && (fields[14].GetCppString() != ""))
+    if(sWorld.getConfig(CONFIG_DECLINED_NAMES_USED))
+    {
+        if(!fields[15].GetCppString().empty())
+            char_flags |= CHARACTER_FLAG_DECLINED;
+    }
+    else
         char_flags |= CHARACTER_FLAG_DECLINED;
 
     *p_data << uint32(char_flags);                          // character flags
@@ -1462,12 +1469,12 @@ void Player::BuildEnumData( QueryResult * result, WorldPacket * p_data )
         // show pet at selection character in character list  only for non-ghost character
         if (result && isAlive() && (pClass == CLASS_WARLOCK || pClass == CLASS_HUNTER || pClass == CLASS_DEATH_KNIGHT))
         {
-            uint32 entry = fields[10].GetUInt32();
+            uint32 entry = fields[11].GetUInt32();
             CreatureInfo const* cInfo = sCreatureStorage.LookupEntry<CreatureInfo>(entry);
             if(cInfo)
             {
-                petDisplayId = fields[11].GetUInt32();
-                petLevel     = fields[12].GetUInt32();
+                petDisplayId = fields[12].GetUInt32();
+                petLevel     = fields[13].GetUInt32();
                 petFamily    = cInfo->family;
             }
         }
@@ -1611,7 +1618,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         if (!(options & TELE_TO_NOT_UNSUMMON_PET))
         {
             //same map, only remove pet if out of range for new position
-            if(pet && pet->GetDistance(x,y,z) >= OWNER_MAX_DISTANCE)
+            if(pet && !pet->IsWithinDist3d(x,y,z, OWNER_MAX_DISTANCE))
                 UnsummonPetTemporaryIfAny();
         }
 
@@ -2068,11 +2075,17 @@ void Player::SetGameMaster(bool on)
         setFaction(35);
         SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM);
 
+        if (Pet* pet = GetPet())
+        {
+            pet->setFaction(35);
+            pet->getHostilRefManager().setOnlineOfflineState(false);
+        }
+
         RemoveByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_FFA_PVP);
         ResetContestedPvP();
 
         getHostilRefManager().setOnlineOfflineState(false);
-        CombatStop();
+        CombatStopWithPets();
 
         SetPhaseMask(PHASEMASK_ANYWHERE,false);             // see and visible in all phases
     }
@@ -2085,6 +2098,12 @@ void Player::SetGameMaster(bool on)
         m_ExtraFlags &= ~ PLAYER_EXTRA_GM_ON;
         setFactionForRace(getRace());
         RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM);
+
+        if (Pet* pet = GetPet())
+        {
+            pet->setFaction(getFaction());
+            pet->getHostilRefManager().setOnlineOfflineState(true);
+        }
 
         // restore FFA PvP Server state
         if(sWorld.IsFFAPvPRealm())
@@ -2297,10 +2316,10 @@ void Player::GiveLevel(uint32 level)
     SetPower(POWER_FOCUS, 0);
     SetPower(POWER_HAPPINESS, 0);
 
-    // give level to summoned pet
-    Pet* pet = GetPet();
-    if(pet && pet->getPetType()==SUMMON_PET)
-        pet->GivePetLevel(level);
+    // update level to hunter/summon pet
+    if (Pet* pet = GetPet())
+        pet->SynchronizeLevelWithOwner();
+
     GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_LEVEL);
 }
 
@@ -2486,6 +2505,10 @@ void Player::InitStatsForLevel(bool reapplyMods)
     SetPower(POWER_FOCUS, 0);
     SetPower(POWER_HAPPINESS, 0);
     SetPower(POWER_RUNIC_POWER, 0);
+
+    // update level to hunter/summon pet
+    if (Pet* pet = GetPet())
+        pet->SynchronizeLevelWithOwner();
 }
 
 void Player::SendInitialSpells()
@@ -5669,23 +5692,26 @@ ReputationRank Player::GetReputationRank(uint32 faction) const
 }
 
 //Calculate total reputation percent player gain with quest/creature level
-int32 Player::CalculateReputationGain(uint32 creatureOrQuestLevel, int32 rep, bool for_quest)
+int32 Player::CalculateReputationGain(uint32 creatureOrQuestLevel, int32 rep, int32 faction, bool for_quest)
 {
     float percent = 100.0f;
 
     float rate = for_quest ? sWorld.getRate(RATE_REPUTATION_LOWLEVEL_QUEST) : sWorld.getRate(RATE_REPUTATION_LOWLEVEL_KILL);
 
-    if(rate != 1.0f && creatureOrQuestLevel <= MaNGOS::XP::GetGrayLevel(getLevel()))
+    if (rate != 1.0f && creatureOrQuestLevel <= MaNGOS::XP::GetGrayLevel(getLevel()))
         percent *= rate;
 
-    int32 repMod = GetTotalAuraModifier(SPELL_AURA_MOD_REPUTATION_GAIN);
+    float repMod = GetTotalAuraModifier(SPELL_AURA_MOD_REPUTATION_GAIN);
+
+    if (!for_quest)
+        repMod += GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_FACTION_REPUTATION_GAIN, faction);
 
     percent += rep > 0 ? repMod : -repMod;
 
-    if(percent <= 0.0f)
+    if (percent <= 0.0f)
         return 0;
 
-    return int32(sWorld.getRate(RATE_REPUTATION_GAIN)*rep*percent/100);
+    return int32(sWorld.getRate(RATE_REPUTATION_GAIN)*rep*percent/100.0f);
 }
 
 //Calculates how many reputation points player gains in victim's enemy factions
@@ -5701,7 +5727,7 @@ void Player::RewardReputation(Unit *pVictim, float rate)
 
     if(Rep->repfaction1 && (!Rep->team_dependent || GetTeam()==ALLIANCE))
     {
-        int32 donerep1 = CalculateReputationGain(pVictim->getLevel(),Rep->repvalue1,false);
+        int32 donerep1 = CalculateReputationGain(pVictim->getLevel(), Rep->repvalue1, Rep->repfaction1, false);
         donerep1 = int32(donerep1*rate);
         FactionEntry const *factionEntry1 = sFactionStore.LookupEntry(Rep->repfaction1);
         uint32 current_reputation_rank1 = GetReputationMgr().GetRank(factionEntry1);
@@ -5719,7 +5745,7 @@ void Player::RewardReputation(Unit *pVictim, float rate)
 
     if(Rep->repfaction2 && (!Rep->team_dependent || GetTeam()==HORDE))
     {
-        int32 donerep2 = CalculateReputationGain(pVictim->getLevel(),Rep->repvalue2,false);
+        int32 donerep2 = CalculateReputationGain(pVictim->getLevel(), Rep->repvalue2, Rep->repfaction2, false);
         donerep2 = int32(donerep2*rate);
         FactionEntry const *factionEntry2 = sFactionStore.LookupEntry(Rep->repfaction2);
         uint32 current_reputation_rank2 = GetReputationMgr().GetRank(factionEntry2);
@@ -5744,7 +5770,7 @@ void Player::RewardReputation(Quest const *pQuest)
     {
         if(pQuest->RewRepFaction[i] && pQuest->RewRepValue[i] )
         {
-            int32 rep = CalculateReputationGain(GetQuestLevel(pQuest),pQuest->RewRepValue[i],true);
+            int32 rep = CalculateReputationGain(GetQuestLevel(pQuest), pQuest->RewRepValue[i], pQuest->RewRepFaction[i], true);
             FactionEntry const* factionEntry = sFactionStore.LookupEntry(pQuest->RewRepFaction[i]);
             if(factionEntry)
                 GetReputationMgr().ModifyReputation(factionEntry, rep);
@@ -6039,7 +6065,10 @@ void Player::UpdateArea(uint32 newArea)
 
 void Player::UpdateZone(uint32 newZone, uint32 newArea)
 {
-    if(m_zoneUpdateId != newZone)
+
+    uint32 oldZoneId  = m_zoneUpdateId;
+
+	if(m_zoneUpdateId != newZone)
         SendInitWorldStates(newZone, newArea);              // only if really enters to new zone, not just area change, works strange...
 
     m_zoneUpdateId    = newZone;
@@ -6051,6 +6080,13 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
     AreaTableEntry const* zone = GetAreaEntryByAreaID(newZone);
     if(!zone)
         return;
+
+    // inform outdoor pvp
+    if(oldZoneId != m_zoneUpdateId)
+    {
+        sOutdoorPvPMgr.HandlePlayerLeaveZone(this, oldZoneId);
+        sOutdoorPvPMgr.HandlePlayerEnterZone(this, m_zoneUpdateId);
+    }
 
     if (sWorld.getConfig(CONFIG_WEATHER))
     {
@@ -6201,6 +6237,11 @@ void Player::CheckDuelDistance(time_t currTime)
     }
 }
 
+bool Player::IsOutdoorPvPActive()
+{
+    return (isAlive() && !HasInvisibilityAura() && !HasStealthAura() && (HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_IN_PVP) || sWorld.IsPvPRealm())  && !HasUnitMovementFlag(MOVEMENTFLAG_FLYING2) && !isInFlight());
+}
+
 void Player::DuelComplete(DuelCompleteType type)
 {
     // duel not requested
@@ -6335,30 +6376,25 @@ void Player::_ApplyItemBonuses(ItemPrototype const *proto, uint8 slot, bool appl
     if(slot >= INVENTORY_SLOT_BAG_END || !proto)
         return;
 
+    ScalingStatDistributionEntry const *ssd = proto->ScalingStatDistribution ? sScalingStatDistributionStore.LookupEntry(proto->ScalingStatDistribution) : 0;
+    ScalingStatValuesEntry const *ssv = proto->ScalingStatValue ? sScalingStatValuesStore.LookupEntry(getLevel()) : 0;
+
     for (int i = 0; i < MAX_ITEM_PROTO_STATS; ++i)
     {
         uint32 statType = 0;
-        int32 val = 0;
-
-        if(proto->ScalingStatDistribution)
+        int32  val = 0;
+        // If set ScalingStatDistribution need get stats and values from it
+        if (ssd && ssv)
         {
-            if(ScalingStatDistributionEntry const *ssd = sScalingStatDistributionStore.LookupEntry(proto->ScalingStatDistribution))
-            {
-                statType = ssd->StatMod[i];
-
-                if(uint32 modifier = ssd->Modifier[i])
-                {
-                    uint32 level = ((getLevel() > ssd->MaxLevel) ? ssd->MaxLevel : getLevel());
-                    if(ScalingStatValuesEntry const *ssv = sScalingStatValuesStore.LookupEntry(level))
-                    {
-                        uint32 multiplier = ssv->Multiplier[proto->GetScalingStatValuesColumn()];
-                        val = (multiplier * modifier) / 10000;
-                    }
-                }
-            }
+            if (ssd->StatMod[i] < 0)
+                continue;
+            statType = ssd->StatMod[i];
+            val = (ssv->getssdMultiplier(proto->ScalingStatValue) * ssd->Modifier[i]) / 10000;
         }
         else
         {
+            if (i >= proto->StatsCount)
+                continue;
             statType = proto->ItemStat[i].ItemStatType;
             val = proto->ItemStat[i].ItemStatValue;
         }
@@ -6513,8 +6549,18 @@ void Player::_ApplyItemBonuses(ItemPrototype const *proto, uint8 slot, bool appl
         }
     }
 
-    if (proto->Armor)
-        HandleStatModifier(UNIT_MOD_ARMOR, BASE_VALUE, float(proto->Armor), apply);
+    // If set ScalingStatValue armor get it or use item armor
+    uint32 armor = proto->Armor;
+    if (ssv)
+    {
+        if (uint32 ssvarmor = ssv->getArmorMod(proto->ScalingStatValue))
+            armor = ssvarmor;
+    }
+    // Add armor bonus from ArmorDamageModifier if > 0
+    if (proto->ArmorDamageModifier > 0)
+        armor+=proto->ArmorDamageModifier;
+    if (armor)
+        HandleStatModifier(UNIT_MOD_ARMOR, BASE_VALUE, float(armor), apply);
 
     if (proto->Block)
         HandleBaseModValue(SHIELD_BLOCK_VALUE, FLAT_MOD, float(proto->Block), apply);
@@ -6551,23 +6597,42 @@ void Player::_ApplyItemBonuses(ItemPrototype const *proto, uint8 slot, bool appl
         attType = OFF_ATTACK;
     }
 
-    if (proto->Damage[0].DamageMin > 0 )
+    float minDamage = proto->Damage[0].DamageMin;
+    float maxDamage = proto->Damage[0].DamageMax;
+    int32 extraDPS = 0;
+    // If set dpsMod in ScalingStatValue use it for min (70% from average), max (130% from average) damage
+    if (ssv)
     {
-        damage = apply ? proto->Damage[0].DamageMin : BASE_MINDAMAGE;
+        if (extraDPS = ssv->getDPSMod(proto->ScalingStatValue))
+        {
+            float average = extraDPS * proto->Delay / 1000.0f;
+            minDamage = 0.7f * average;
+            maxDamage = 1.3f * average;
+        }
+    }
+    if (minDamage > 0 )
+    {
+        damage = apply ? minDamage : BASE_MINDAMAGE;
         SetBaseWeaponDamage(attType, MINDAMAGE, damage);
         //sLog.outError("applying mindam: assigning %f to weapon mindamage, now is: %f", damage, GetWeaponDamageRange(attType, MINDAMAGE));
     }
 
-    if (proto->Damage[0].DamageMax  > 0 )
+    if (maxDamage  > 0 )
     {
-        damage = apply ? proto->Damage[0].DamageMax : BASE_MAXDAMAGE;
+        damage = apply ? maxDamage : BASE_MAXDAMAGE;
         SetBaseWeaponDamage(attType, MAXDAMAGE, damage);
     }
 
-    // Druids get feral AP bonus from weapon dps
+    // Apply feral bonus from ScalingStatValue if set
+    if (ssv)
+    {
+        if (int32 feral_bonus = ssv->getFeralBonus(proto->ScalingStatValue))
+            ApplyFeralAPBonus(feral_bonus, apply);
+    }
+    // Druids get feral AP bonus from weapon dps (lso use DPS from ScalingStatValue)
     if(getClass() == CLASS_DRUID)
     {
-        int32 feral_bonus = proto->getFeralBonus();
+        int32 feral_bonus = proto->getFeralBonus(extraDPS);
         if (feral_bonus > 0)
             ApplyFeralAPBonus(feral_bonus, apply);
     }
@@ -7409,7 +7474,7 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
     uint16 NumberOfFields = 0;
     uint32 mapid = GetMapId();
 
-    sLog.outDebug("Sending SMSG_INIT_WORLD_STATES to Map:%u, Zone: %u", mapid, zoneid);
+	sLog.outDebug("Sending SMSG_INIT_WORLD_STATES to Map:%u, Zone: %u", mapid, zoneid);
 
     // may be exist better way to do this...
     switch(zoneid)
@@ -7506,6 +7571,68 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
         case 1519:
         case 1537:
         case 2257:
+            break;
+        case 139: // EPL
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_EP)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    data << uint32(0x97a) << uint32(0x0); // 10 2426
+                    data << uint32(0x917) << uint32(0x0); // 11 2327
+                    data << uint32(0x918) << uint32(0x0); // 12 2328
+                    data << uint32(0x97b) << uint32(0x32); // 13 2427
+                    data << uint32(0x97c) << uint32(0x32); // 14 2428
+                    data << uint32(0x933) << uint32(0x1); // 15 2355
+                    data << uint32(0x946) << uint32(0x0); // 16 2374
+                    data << uint32(0x947) << uint32(0x0); // 17 2375
+                    data << uint32(0x948) << uint32(0x0); // 18 2376
+                    data << uint32(0x949) << uint32(0x0); // 19 2377
+                    data << uint32(0x94a) << uint32(0x0); // 20 2378
+                    data << uint32(0x94b) << uint32(0x0); // 21 2379
+                    data << uint32(0x932) << uint32(0x0); // 22 2354
+                    data << uint32(0x934) << uint32(0x0); // 23 2356
+                    data << uint32(0x935) << uint32(0x0); // 24 2357
+                    data << uint32(0x936) << uint32(0x0); // 25 2358
+                    data << uint32(0x937) << uint32(0x0); // 26 2359
+                    data << uint32(0x938) << uint32(0x0); // 27 2360
+                    data << uint32(0x939) << uint32(0x1); // 28 2361
+                    data << uint32(0x930) << uint32(0x1); // 29 2352
+                    data << uint32(0x93a) << uint32(0x0); // 30 2362
+                    data << uint32(0x93b) << uint32(0x0); // 31 2363
+                    data << uint32(0x93c) << uint32(0x0); // 32 2364
+                    data << uint32(0x93d) << uint32(0x0); // 33 2365
+                    data << uint32(0x944) << uint32(0x0); // 34 2372
+                    data << uint32(0x945) << uint32(0x0); // 35 2373
+                    data << uint32(0x931) << uint32(0x1); // 36 2353
+                    data << uint32(0x93e) << uint32(0x0); // 37 2366
+                    data << uint32(0x931) << uint32(0x1); // 38 2367 ??  grey horde not in dbc! send for consistency's sake, and to match field count
+                    data << uint32(0x940) << uint32(0x0); // 39 2368
+                    data << uint32(0x941) << uint32(0x0); // 7 2369
+                    data << uint32(0x942) << uint32(0x0); // 8 2370
+                    data << uint32(0x943) << uint32(0x0); // 9 2371
+                }
+            }
+            break;
+        case 1377: // Silithus
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_SI)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    // states are always shown
+                    data << uint32(2313) << uint32(0x0); // 7 ally silityst gathered
+                    data << uint32(2314) << uint32(0x0); // 8 horde silityst gathered
+                    data << uint32(2317) << uint32(0x0); // 9 max silithyst
+                }
+                // dunno about these... aq opening event maybe?
+                data << uint32(2322) << uint32(0x0); // 10 sandworm N
+                data << uint32(2323) << uint32(0x0); // 11 sandworm S
+                data << uint32(2324) << uint32(0x0); // 12 sandworm SW
+                data << uint32(2325) << uint32(0x0); // 13 sandworm E
+            }
             break;
         case 2597:                                          // AV
             data << uint32(0x7ae) << uint32(0x1);           // 7
@@ -7678,77 +7805,150 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
                 // and some more ... unknown
             }
             break;
+        // any of these needs change! the client remembers the prev setting!
+        // ON EVERY ZONE LEAVE, RESET THE OLD ZONE'S WORLD STATE, BUT AT LEAST THE UI STUFF!
         case 3483:                                          // Hellfire Peninsula
-            data << uint32(0x9ba) << uint32(0x1);           // 10
-            data << uint32(0x9b9) << uint32(0x1);           // 11
-            data << uint32(0x9b5) << uint32(0x0);           // 12
-            data << uint32(0x9b4) << uint32(0x1);           // 13
-            data << uint32(0x9b3) << uint32(0x0);           // 14
-            data << uint32(0x9b2) << uint32(0x0);           // 15
-            data << uint32(0x9b1) << uint32(0x1);           // 16
-            data << uint32(0x9b0) << uint32(0x0);           // 17
-            data << uint32(0x9ae) << uint32(0x0);           // 18 horde pvp objectives captured
-            data << uint32(0x9ac) << uint32(0x0);           // 19
-            data << uint32(0x9a8) << uint32(0x0);           // 20
-            data << uint32(0x9a7) << uint32(0x0);           // 21
-            data << uint32(0x9a6) << uint32(0x1);           // 22
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_HP)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    data << uint32(0x9ba) << uint32(0x1);           // 10 // add ally tower main gui icon       // maybe should be sent only on login?
+                    data << uint32(0x9b9) << uint32(0x1);           // 11 // add horde tower main gui icon      // maybe should be sent only on login?
+                    data << uint32(0x9b5) << uint32(0x0);           // 12 // show neutral broken hill icon      // 2485
+                    data << uint32(0x9b4) << uint32(0x1);           // 13 // show icon above broken hill        // 2484
+                    data << uint32(0x9b3) << uint32(0x0);           // 14 // show ally broken hill icon         // 2483
+                    data << uint32(0x9b2) << uint32(0x0);           // 15 // show neutral overlook icon         // 2482
+                    data << uint32(0x9b1) << uint32(0x1);           // 16 // show the overlook arrow            // 2481
+                    data << uint32(0x9b0) << uint32(0x0);           // 17 // show ally overlook icon            // 2480
+                    data << uint32(0x9ae) << uint32(0x0);           // 18 // horde pvp objectives captured      // 2478
+                    data << uint32(0x9ac) << uint32(0x0);           // 19 // ally pvp objectives captured       // 2476
+                    data << uint32(2475)  << uint32(100); //: ally / horde slider grey area                              // show only in direct vicinity!
+                    data << uint32(2474)  << uint32(50);  //: ally / horde slider percentage, 100 for ally, 0 for horde  // show only in direct vicinity!
+                    data << uint32(2473)  << uint32(0);   //: ally / horde slider display                                // show only in direct vicinity!
+                    data << uint32(0x9a8) << uint32(0x0);           // 20 // show the neutral stadium icon      // 2472
+                    data << uint32(0x9a7) << uint32(0x0);           // 21 // show the ally stadium icon         // 2471
+                    data << uint32(0x9a6) << uint32(0x1);           // 22 // show the horde stadium icon        // 2470
+                }
+            }
+            break;
+        case 3518:
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_NA)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    data << uint32(2503) << uint32(0x0);    // 10
+                    data << uint32(2502) << uint32(0x0);    // 11
+                    data << uint32(2493) << uint32(0x0);    // 12
+                    data << uint32(2491) << uint32(0x0);    // 13
+
+                    data << uint32(2495) << uint32(0x0);    // 14
+                    data << uint32(2494) << uint32(0x0);    // 15
+                    data << uint32(2497) << uint32(0x0);    // 16
+
+                    data << uint32(2762) << uint32(0x0);    // 17
+                    data << uint32(2662) << uint32(0x0);    // 18
+                    data << uint32(2663) << uint32(0x0);    // 19
+                    data << uint32(2664) << uint32(0x0);    // 20
+
+                    data << uint32(2760) << uint32(0x0);    // 21
+                    data << uint32(2670) << uint32(0x0);    // 22
+                    data << uint32(2668) << uint32(0x0);    // 23
+                    data << uint32(2669) << uint32(0x0);    // 24
+
+                    data << uint32(2761) << uint32(0x0);    // 25
+                    data << uint32(2667) << uint32(0x0);    // 26
+                    data << uint32(2665) << uint32(0x0);    // 27
+                    data << uint32(2666) << uint32(0x0);    // 28
+
+                    data << uint32(2763) << uint32(0x0);    // 29
+                    data << uint32(2659) << uint32(0x0);    // 30
+                    data << uint32(2660) << uint32(0x0);    // 31
+                    data << uint32(2661) << uint32(0x0);    // 32
+
+                    data << uint32(2671) << uint32(0x0);    // 33
+                    data << uint32(2676) << uint32(0x0);    // 34
+                    data << uint32(2677) << uint32(0x0);    // 35
+                    data << uint32(2672) << uint32(0x0);    // 36
+                    data << uint32(2673) << uint32(0x0);    // 37
+                }
+            }
             break;
         case 3519:                                          // Terokkar Forest
-            data << uint32(0xa41) << uint32(0x0);           // 10
-            data << uint32(0xa40) << uint32(0x14);          // 11
-            data << uint32(0xa3f) << uint32(0x0);           // 12
-            data << uint32(0xa3e) << uint32(0x0);           // 13
-            data << uint32(0xa3d) << uint32(0x5);           // 14
-            data << uint32(0xa3c) << uint32(0x0);           // 15
-            data << uint32(0xa87) << uint32(0x0);           // 16
-            data << uint32(0xa86) << uint32(0x0);           // 17
-            data << uint32(0xa85) << uint32(0x0);           // 18
-            data << uint32(0xa84) << uint32(0x0);           // 19
-            data << uint32(0xa83) << uint32(0x0);           // 20
-            data << uint32(0xa82) << uint32(0x0);           // 21
-            data << uint32(0xa81) << uint32(0x0);           // 22
-            data << uint32(0xa80) << uint32(0x0);           // 23
-            data << uint32(0xa7e) << uint32(0x0);           // 24
-            data << uint32(0xa7d) << uint32(0x0);           // 25
-            data << uint32(0xa7c) << uint32(0x0);           // 26
-            data << uint32(0xa7b) << uint32(0x0);           // 27
-            data << uint32(0xa7a) << uint32(0x0);           // 28
-            data << uint32(0xa79) << uint32(0x0);           // 29
-            data << uint32(0x9d0) << uint32(0x5);           // 30
-            data << uint32(0x9ce) << uint32(0x0);           // 31
-            data << uint32(0x9cd) << uint32(0x0);           // 32
-            data << uint32(0x9cc) << uint32(0x0);           // 33
-            data << uint32(0xa88) << uint32(0x0);           // 34
-            data << uint32(0xad0) << uint32(0x0);           // 35
-            data << uint32(0xacf) << uint32(0x1);           // 36
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_TF)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    data << uint32(0xa41) << uint32(0x0);           // 10 // 2625 capture bar pos
+                    data << uint32(0xa40) << uint32(0x14);          // 11 // 2624 capture bar neutral
+                    data << uint32(0xa3f) << uint32(0x0);           // 12 // 2623 show capture bar
+                    data << uint32(0xa3e) << uint32(0x0);           // 13 // 2622 horde towers controlled
+                    data << uint32(0xa3d) << uint32(0x5);           // 14 // 2621 ally towers controlled
+                    data << uint32(0xa3c) << uint32(0x0);           // 15 // 2620 show towers controlled
+                    data << uint32(0xa88) << uint32(0x0);           // 16 // 2696 SE Neu
+                    data << uint32(0xa87) << uint32(0x0);           // 17 // SE Horde
+                    data << uint32(0xa86) << uint32(0x0);           // 18 // SE Ally
+                    data << uint32(0xa85) << uint32(0x0);           // 19 //S Neu
+                    data << uint32(0xa84) << uint32(0x0);           // 20 S Horde
+                    data << uint32(0xa83) << uint32(0x0);           // 21 S Ally
+                    data << uint32(0xa82) << uint32(0x0);           // 22 NE Neu
+                    data << uint32(0xa81) << uint32(0x0);           // 23 NE Horde
+                    data << uint32(0xa80) << uint32(0x0);           // 24 NE Ally
+                    data << uint32(0xa7e) << uint32(0x0);           // 25 // 2686 N Neu
+                    data << uint32(0xa7d) << uint32(0x0);           // 26 N Horde
+                    data << uint32(0xa7c) << uint32(0x0);           // 27 N Ally
+                    data << uint32(0xa7b) << uint32(0x0);           // 28 NW Ally
+                    data << uint32(0xa7a) << uint32(0x0);           // 29 NW Horde
+                    data << uint32(0xa79) << uint32(0x0);           // 30 NW Neutral
+                    data << uint32(0x9d0) << uint32(0x5);           // 31 // 2512 locked time remaining seconds first digit
+                    data << uint32(0x9ce) << uint32(0x0);           // 32 // 2510 locked time remaining seconds second digit
+                    data << uint32(0x9cd) << uint32(0x0);           // 33 // 2509 locked time remaining minutes
+                    data << uint32(0x9cc) << uint32(0x0);           // 34 // 2508 neutral locked time show
+                    data << uint32(0xad0) << uint32(0x0);           // 35 // 2768 horde locked time show
+                    data << uint32(0xacf) << uint32(0x1);           // 36 // 2767 ally locked time show
+                }
+            }
             break;
         case 3521:                                          // Zangarmarsh
-            data << uint32(0x9e1) << uint32(0x0);           // 10
-            data << uint32(0x9e0) << uint32(0x0);           // 11
-            data << uint32(0x9df) << uint32(0x0);           // 12
-            data << uint32(0xa5d) << uint32(0x1);           // 13
-            data << uint32(0xa5c) << uint32(0x0);           // 14
-            data << uint32(0xa5b) << uint32(0x1);           // 15
-            data << uint32(0xa5a) << uint32(0x0);           // 16
-            data << uint32(0xa59) << uint32(0x1);           // 17
-            data << uint32(0xa58) << uint32(0x0);           // 18
-            data << uint32(0xa57) << uint32(0x0);           // 19
-            data << uint32(0xa56) << uint32(0x0);           // 20
-            data << uint32(0xa55) << uint32(0x1);           // 21
-            data << uint32(0xa54) << uint32(0x0);           // 22
-            data << uint32(0x9e7) << uint32(0x0);           // 23
-            data << uint32(0x9e6) << uint32(0x0);           // 24
-            data << uint32(0x9e5) << uint32(0x0);           // 25
-            data << uint32(0xa00) << uint32(0x0);           // 26
-            data << uint32(0x9ff) << uint32(0x1);           // 27
-            data << uint32(0x9fe) << uint32(0x0);           // 28
-            data << uint32(0x9fd) << uint32(0x0);           // 29
-            data << uint32(0x9fc) << uint32(0x1);           // 30
-            data << uint32(0x9fb) << uint32(0x0);           // 31
-            data << uint32(0xa62) << uint32(0x0);           // 32
-            data << uint32(0xa61) << uint32(0x1);           // 33
-            data << uint32(0xa60) << uint32(0x1);           // 34
-            data << uint32(0xa5f) << uint32(0x0);           // 35
+            {
+                OutdoorPvP * pvp = this->GetOutdoorPvP();
+                if(pvp && pvp->GetTypeId() == OUTDOOR_PVP_ZM)
+                    pvp->FillInitialWorldStates(data);
+                else
+                {
+                    data << uint32(0x9e1) << uint32(0x0);           // 10 //2529
+                    data << uint32(0x9e0) << uint32(0x0);           // 11
+                    data << uint32(0x9df) << uint32(0x0);           // 12
+                    data << uint32(0xa5d) << uint32(0x1);           // 13 //2653
+                    data << uint32(0xa5c) << uint32(0x0);           // 14 //2652 east beacon neutral
+                    data << uint32(0xa5b) << uint32(0x1);           // 15 horde
+                    data << uint32(0xa5a) << uint32(0x0);           // 16 ally
+                    data << uint32(0xa59) << uint32(0x1);           // 17 // 2649 Twin spire graveyard horde  12???
+                    data << uint32(0xa58) << uint32(0x0);           // 18 ally     14 ???
+                    data << uint32(0xa57) << uint32(0x0);           // 19 neutral  7???
+                    data << uint32(0xa56) << uint32(0x0);           // 20 // 2646 west beacon neutral
+                    data << uint32(0xa55) << uint32(0x1);           // 21 horde
+                    data << uint32(0xa54) << uint32(0x0);           // 22 ally
+                    data << uint32(0x9e7) << uint32(0x0);           // 23 // 2535
+                    data << uint32(0x9e6) << uint32(0x0);           // 24
+                    data << uint32(0x9e5) << uint32(0x0);           // 25
+                    data << uint32(0xa00) << uint32(0x0);           // 26 // 2560
+                    data << uint32(0x9ff) << uint32(0x1);           // 27
+                    data << uint32(0x9fe) << uint32(0x0);           // 28
+                    data << uint32(0x9fd) << uint32(0x0);           // 29
+                    data << uint32(0x9fc) << uint32(0x1);           // 30
+                    data << uint32(0x9fb) << uint32(0x0);           // 31
+                    data << uint32(0xa62) << uint32(0x0);           // 32 // 2658
+                    data << uint32(0xa61) << uint32(0x1);           // 33
+                    data << uint32(0xa60) << uint32(0x1);           // 34
+                    data << uint32(0xa5f) << uint32(0x0);           // 35
+                }
+            }
             break;
         case 3698:                                          // Nagrand Arena
             if (bg && bg->GetTypeID() == BATTLEGROUND_NA)
@@ -9563,18 +9763,22 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
                     return EQUIP_ERR_CANT_DO_RIGHT_NOW;
             }
 
-            uint8 eslot = FindEquipSlot( pProto, slot, swap );
-            if( eslot == NULL_SLOT )
+            ScalingStatDistributionEntry const *ssd = pProto->ScalingStatDistribution ? sScalingStatDistributionStore.LookupEntry(pProto->ScalingStatDistribution) : 0;
+            if (ssd && ssd->MaxLevel < getLevel())
                 return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
 
-            uint8 msg = CanUseItem( pItem , not_loading );
-            if( msg != EQUIP_ERR_OK )
+            uint8 eslot = FindEquipSlot( pProto, slot, swap );
+            if (eslot == NULL_SLOT)
+                return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
+
+            uint8 msg = CanUseItem(pItem , not_loading);
+            if (msg != EQUIP_ERR_OK)
                 return msg;
-            if( !swap && GetItemByPos( INVENTORY_SLOT_BAG_0, eslot ) )
+            if (!swap && GetItemByPos(INVENTORY_SLOT_BAG_0, eslot))
                 return EQUIP_ERR_NO_EQUIPMENT_SLOT_AVAILABLE;
 
             // if swap ignore item (equipped also)
-            if(uint8 res2 = CanEquipUniqueItem(pItem, swap ? eslot : NULL_SLOT))
+            if (uint8 res2 = CanEquipUniqueItem(pItem, swap ? eslot : NULL_SLOT))
                 return res2;
 
             // check unique-equipped special item classes
@@ -9582,19 +9786,16 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
             {
                 for(int i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
                 {
-                    if( Item* pBag = GetItemByPos( INVENTORY_SLOT_BAG_0, i ) )
+                    if (Item* pBag = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                     {
-                        if( pBag != pItem )
+                        if (pBag != pItem)
                         {
-                            if( ItemPrototype const* pBagProto = pBag->GetProto() )
+                            if (ItemPrototype const* pBagProto = pBag->GetProto())
                             {
-                                if( pBagProto->Class==pProto->Class && (!swap || pBag->GetSlot() != eslot ) )
-                                {
-                                    if(pBagProto->SubClass == ITEM_SUBCLASS_AMMO_POUCH)
-                                        return EQUIP_ERR_CAN_EQUIP_ONLY1_AMMOPOUCH;
-                                    else
-                                        return EQUIP_ERR_CAN_EQUIP_ONLY1_QUIVER;
-                                }
+                                if (pBagProto->Class==pProto->Class && (!swap || pBag->GetSlot() != eslot))
+                                    return (pBagProto->SubClass == ITEM_SUBCLASS_AMMO_POUCH)
+                                        ? EQUIP_ERR_CAN_EQUIP_ONLY1_AMMOPOUCH
+                                        : EQUIP_ERR_CAN_EQUIP_ONLY1_QUIVER;
                             }
                         }
                     }
@@ -9603,25 +9804,25 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
 
             uint32 type = pProto->InventoryType;
 
-            if(eslot == EQUIPMENT_SLOT_OFFHAND)
+            if (eslot == EQUIPMENT_SLOT_OFFHAND)
             {
                 if (type == INVTYPE_WEAPON || type == INVTYPE_WEAPONOFFHAND)
                 {
-                    if(!CanDualWield())
+                    if (!CanDualWield())
                         return EQUIP_ERR_CANT_DUAL_WIELD;
                 }
                 else if (type == INVTYPE_2HWEAPON)
                 {
-                    if(!CanDualWield() || !CanTitanGrip())
+                    if (!CanDualWield() || !CanTitanGrip())
                         return EQUIP_ERR_CANT_DUAL_WIELD;
                 }
 
-                if(IsTwoHandUsed())
+                if (IsTwoHandUsed())
                     return EQUIP_ERR_CANT_EQUIP_WITH_TWOHANDED;
             }
 
             // equip two-hand weapon case (with possible unequip 2 items)
-            if( type == INVTYPE_2HWEAPON )
+            if (type == INVTYPE_2HWEAPON)
             {
                 if (eslot == EQUIPMENT_SLOT_OFFHAND)
                 {
@@ -9636,9 +9837,9 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
                     // offhand item must can be stored in inventory for offhand item and it also must be unequipped
                     Item *offItem = GetItemByPos( INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND );
                     ItemPosCountVec off_dest;
-                    if( offItem && (!not_loading ||
+                    if (offItem && (!not_loading ||
                         CanUnequipItem(uint16(INVENTORY_SLOT_BAG_0) << 8 | EQUIPMENT_SLOT_OFFHAND,false) !=  EQUIP_ERR_OK ||
-                        CanStoreItem( NULL_BAG, NULL_SLOT, off_dest, offItem, false ) !=  EQUIP_ERR_OK ) )
+                        CanStoreItem( NULL_BAG, NULL_SLOT, off_dest, offItem, false ) !=  EQUIP_ERR_OK ))
                         return swap ? EQUIP_ERR_ITEMS_CANT_BE_SWAPPED : EQUIP_ERR_INVENTORY_FULL;
                 }
             }
@@ -9646,10 +9847,8 @@ uint8 Player::CanEquipItem( uint8 slot, uint16 &dest, Item *pItem, bool swap, bo
             return EQUIP_ERR_OK;
         }
     }
-    if( !swap )
-        return EQUIP_ERR_ITEM_NOT_FOUND;
-    else
-        return EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
+
+    return !swap ? EQUIP_ERR_ITEM_NOT_FOUND : EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
 }
 
 uint8 Player::CanUnequipItem( uint16 pos, bool swap ) const
@@ -9868,38 +10067,49 @@ uint8 Player::CanBankItem( uint8 bag, uint8 slot, ItemPosCountVec &dest, Item *p
 
 uint8 Player::CanUseItem( Item *pItem, bool not_loading ) const
 {
-    if( pItem )
+    if (pItem)
     {
         sLog.outDebug( "STORAGE: CanUseItem item = %u", pItem->GetEntry());
-        if( !isAlive() && not_loading )
+
+        if (!isAlive() && not_loading)
             return EQUIP_ERR_YOU_ARE_DEAD;
-        //if( isStunned() )
+
+        //if (isStunned())
         //    return EQUIP_ERR_YOU_ARE_STUNNED;
+
         ItemPrototype const *pProto = pItem->GetProto();
-        if( pProto )
+        if (pProto)
         {
-            if( pItem->IsBindedNotWith(GetGUID()) )
+            if (pItem->IsBindedNotWith(GetGUID()))
                 return EQUIP_ERR_DONT_OWN_THAT_ITEM;
-            if( (pProto->AllowableClass & getClassMask()) == 0 || (pProto->AllowableRace & getRaceMask()) == 0 )
+
+            if ((pProto->AllowableClass & getClassMask()) == 0 || (pProto->AllowableRace & getRaceMask()) == 0)
                 return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-            if( pItem->GetSkill() != 0  )
+
+            if (pItem->GetSkill() != 0)
             {
-                if( GetSkillValue( pItem->GetSkill() ) == 0 )
+                if (GetSkillValue( pItem->GetSkill() ) == 0)
                     return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
             }
-            if( pProto->RequiredSkill != 0  )
+
+            if (pProto->RequiredSkill != 0)
             {
-                if( GetSkillValue( pProto->RequiredSkill ) == 0 )
+                if (GetSkillValue( pProto->RequiredSkill ) == 0)
                     return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-                else if( GetSkillValue( pProto->RequiredSkill ) < pProto->RequiredSkillRank )
+
+                if (GetSkillValue( pProto->RequiredSkill ) < pProto->RequiredSkillRank)
                     return EQUIP_ERR_ERR_CANT_EQUIP_SKILL;
             }
-            if( pProto->RequiredSpell != 0 && !HasSpell( pProto->RequiredSpell ) )
+
+            if (pProto->RequiredSpell != 0 && !HasSpell(pProto->RequiredSpell))
                 return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-            if( pProto->RequiredReputationFaction && uint32(GetReputationRank(pProto->RequiredReputationFaction)) < pProto->RequiredReputationRank )
+
+            if (pProto->RequiredReputationFaction && uint32(GetReputationRank(pProto->RequiredReputationFaction)) < pProto->RequiredReputationRank)
                 return EQUIP_ERR_CANT_EQUIP_REPUTATION;
-            if( getLevel() < pProto->RequiredLevel )
+
+            if (getLevel() < pProto->RequiredLevel)
                 return EQUIP_ERR_CANT_EQUIP_LEVEL_I;
+
             return EQUIP_ERR_OK;
         }
     }
@@ -11580,6 +11790,14 @@ void Player::ApplyEnchantment(Item *item,EnchantmentSlot slot,bool apply, bool a
                     sLog.outDebug("Adding %u to stat nb %u",enchant_amount,enchant_spell_id);
                     switch (enchant_spell_id)
                     {
+                        case ITEM_MOD_MANA:
+                            sLog.outDebug("+ %u MANA",enchant_amount);
+                            HandleStatModifier(UNIT_MOD_MANA, BASE_VALUE, float(enchant_amount), apply);
+                            break;
+                        case ITEM_MOD_HEALTH:
+                            sLog.outDebug("+ %u HEALTH",enchant_amount);
+                            HandleStatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(enchant_amount), apply);
+                            break;
                         case ITEM_MOD_AGILITY:
                             sLog.outDebug("+ %u AGILITY",enchant_amount);
                             HandleStatModifier(UNIT_MOD_STAT_AGILITY, TOTAL_VALUE, float(enchant_amount), apply);
@@ -13627,20 +13845,23 @@ void Player::SendQuestUpdateAddCreatureOrGo( Quest const* pQuest, uint64 guid, u
 bool Player::MinimalLoadFromDB( QueryResult *result, uint32 guid )
 {
     bool delete_result = true;
-    if(!result)
+    if (!result)
     {
-        //                                        0     1     2     3           4           5           6    7          8          9
-        result = CharacterDatabase.PQuery("SELECT guid, data, name, position_x, position_y, position_z, map, totaltime, leveltime, at_login FROM characters WHERE guid = '%u'",guid);
-        if(!result) return false;
+        //                                          0     1     2     3           4           5           6    7          8          9         10
+        result = CharacterDatabase.PQuery("SELECT guid, data, name, position_x, position_y, position_z, map, totaltime, leveltime, at_login, zone FROM characters WHERE guid = '%u'",guid);
+        if (!result)
+            return false;
     }
-    else delete_result = false;
+    else
+        delete_result = false;
 
     Field *fields = result->Fetch();
 
-    if(!LoadValues( fields[1].GetString()))
+    if (!LoadValues( fields[1].GetString()))
     {
         sLog.outError("Player #%d have broken data in `data` field. Can't be loaded for character list.",GUID_LOPART(guid));
-        if(delete_result) delete result;
+        if (delete_result)
+            delete result;
         return false;
     }
 
@@ -13663,12 +13884,13 @@ bool Player::MinimalLoadFromDB( QueryResult *result, uint32 guid )
 
     _LoadBoundInstances();*/
 
-    if (delete_result) delete result;
+    if (delete_result)
+        delete result;
 
     for (int i = 0; i < PLAYER_SLOTS_COUNT; ++i)
         m_items[i] = NULL;
 
-    if( HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST) )
+    if (HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
         m_deathState = DEAD;
 
     return true;
@@ -16351,11 +16573,11 @@ void Player::PetSpellInitialize()
         // spells loop
         for (PetSpellMap::const_iterator itr = pet->m_spells.begin(); itr != pet->m_spells.end(); ++itr)
         {
-            if(itr->second->state == PETSPELL_REMOVED)
+            if(itr->second.state == PETSPELL_REMOVED)
                 continue;
 
             data << uint16(itr->first);
-            data << uint16(itr->second->active);            // pet spell active state isn't boolean
+            data << uint16(itr->second.active);             // pet spell active state isn't boolean
             ++addlist;
         }
     }
@@ -18541,6 +18763,11 @@ void Player::AutoUnequipOffhandIfNeed()
     }
 }
 
+OutdoorPvP * Player::GetOutdoorPvP() const
+{
+    return sOutdoorPvPMgr.GetOutdoorPvPToZoneId(GetZoneId());
+}
+
 bool Player::HasItemFitToSpellReqirements(SpellEntry const* spellInfo, Item const* ignoreItem)
 {
     if(spellInfo->EquippedItemClass < 0)
@@ -19974,4 +20201,3 @@ bool Player::canSeeSpellClickOn(Creature const *c) const
     }
     return false;
 }
-

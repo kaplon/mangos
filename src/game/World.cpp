@@ -62,6 +62,7 @@
 #include "WaypointManager.h"
 #include "GMTicketMgr.h"
 #include "Util.h"
+#include "OutdoorPvPMgr.h"
 
 INSTANTIATE_SINGLETON_1( World );
 
@@ -973,7 +974,7 @@ void World::LoadConfigSettings(bool reload)
         sLog.outError("Visibility.Distance.Player can't be greater %f",MAX_VISIBILITY_DISTANCE - m_VisibleUnitGreyDistance);
         m_MaxVisibleDistanceForPlayer = MAX_VISIBILITY_DISTANCE - m_VisibleUnitGreyDistance;
     }
-    m_MaxVisibleDistanceForObject    = sConfig.GetFloatDefault("Visibility.Distance.Gameobject",   DEFAULT_VISIBILITY_DISTANCE);
+    m_MaxVisibleDistanceForObject    = sConfig.GetFloatDefault("Visibility.Distance.Object",   DEFAULT_VISIBILITY_DISTANCE);
     if(m_MaxVisibleDistanceForObject < INTERACTION_DISTANCE)
     {
         sLog.outError("Visibility.Distance.Object can't be less max aggro radius %f",float(INTERACTION_DISTANCE));
@@ -1404,6 +1405,9 @@ void World::SetInitialWorldSettings()
     sBattleGroundMgr.CreateInitialBattleGrounds();
     sBattleGroundMgr.InitAutomaticArenaPointDistribution();
 
+    sLog.outString( "Starting Outdoor PvP System" );
+    sOutdoorPvPMgr.InitOutdoorPvP();
+
     //Not sure if this can be moved up in the sequence (with static data loading) as it uses MapManager
     sLog.outString( "Loading Transports..." );
     MapManager::Instance().LoadTransports();
@@ -1555,6 +1559,8 @@ void World::Update(uint32 diff)
             ScriptsProcess();
 
         sBattleGroundMgr.Update(diff);
+
+        sOutdoorPvPMgr.Update(diff);
     }
 
     // execute callbacks from sql queries that were queued recently
@@ -2450,31 +2456,6 @@ void World::KickAllLess(AccountTypes sec)
     for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
         if(itr->second->GetSecurity() < sec)
             itr->second->KickPlayer();
-}
-
-/// Kick (and save) the designated player
-bool World::KickPlayer(const std::string& playerName)
-{
-    SessionMap::const_iterator itr;
-
-    // session not removed at kick and will removed in next update tick
-    for (itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
-    {
-        if(!itr->second)
-            continue;
-        Player *player = itr->second->GetPlayer();
-        if(!player)
-            continue;
-        if( player->IsInWorld() )
-        {
-            if (playerName == player->GetName())
-            {
-                itr->second->KickPlayer();
-                return true;
-            }
-        }
-    }
-    return false;
 }
 
 /// Ban an account or ban an IP address, duration will be parsed using TimeStringToSecs if it is positive, otherwise permban

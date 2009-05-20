@@ -221,6 +221,8 @@ class MANGOS_DLL_SPEC Item : public Object
         void DeleteFromInventoryDB();
 
         bool IsBag() const { return GetProto()->InventoryType == INVTYPE_BAG; }
+        bool IsArmorVellum() const { return (GetProto()->Class == ITEM_CLASS_TRADE_GOODS && GetProto()->SubClass == ITEM_SUBCLASS_ARMOR_ENCHANTMENT); }
+        bool IsWeaponVellum() const { return (GetProto()->Class == ITEM_CLASS_TRADE_GOODS && GetProto()->SubClass == ITEM_SUBCLASS_WEAPON_ENCHANTMENT); }
         bool IsBroken() const { return GetUInt32Value(ITEM_FIELD_MAXDURABILITY) > 0 && GetUInt32Value(ITEM_FIELD_DURABILITY) == 0; }
         bool CanBeTraded() const;
         void SetInTrade(bool b = true) { mb_in_trade = b; }

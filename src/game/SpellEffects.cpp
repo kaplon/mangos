@@ -46,6 +46,7 @@
 #include "BattleGround.h"
 #include "BattleGroundEY.h"
 #include "BattleGroundWS.h"
+#include "OutdoorPvPMgr.h"
 #include "VMapFactory.h"
 #include "Language.h"
 #include "SocialMgr.h"
@@ -437,6 +438,15 @@ void Spell::EffectSchoolDMG(uint32 effect_idx)
                 {
                     damage += int32(m_caster->GetTotalAttackPowerValue(BASE_ATTACK)*0.08f);
                 }
+                //Improved Insect Swarm
+                else if(m_spellInfo->SpellFamilyFlags & 0x0000000000000001LL && m_spellInfo->SpellIconID==263)
+                {
+                 Aura *ImprovedAura =  m_caster->HasAura(57849) ? m_caster->GetAura(57849,0) : m_caster->HasAura(57850) ? 
+                 m_caster->GetAura(57850,0) : m_caster->HasAura(57851) ? m_caster->GetAura(57851,0) : NULL;
+                 //If the target have a Insect Swarm aura and the caster have the improved aura then we apply the % dmg to Wrath.
+                 if(ImprovedAura && unitTarget->GetAura(SPELL_AURA_PERIODIC_DAMAGE,SPELLFAMILY_DRUID,0x0000000000200000LL))
+                      damage = int32(damage*(100.0f+ImprovedAura->GetModifier()->m_amount)/100.0f);
+                }
                 //Mangle Bonus for the initial damage of Lacerate and Rake
                 if((m_spellInfo->SpellFamilyFlags==0x0000000000001000LL && m_spellInfo->SpellIconID==494) ||
                     (m_spellInfo->SpellFamilyFlags==0x0000010000000000LL && m_spellInfo->SpellIconID==2246))
@@ -589,9 +599,9 @@ void Spell::EffectSchoolDMG(uint32 effect_idx)
                 else if(m_spellInfo->SpellFamilyFlags&0x0004000000000000LL)
                 {
                     // Add main hand dps * effect[2] amount
-                    float averange = (m_caster->GetFloatValue(UNIT_FIELD_MINDAMAGE) + m_caster->GetFloatValue(UNIT_FIELD_MAXDAMAGE)) / 2;
+                    float average = (m_caster->GetFloatValue(UNIT_FIELD_MINDAMAGE) + m_caster->GetFloatValue(UNIT_FIELD_MAXDAMAGE)) / 2;
                     int32 count = m_caster->CalculateSpellDamage(m_spellInfo, 2, m_spellInfo->EffectBasePoints[2], unitTarget);
-                    damage += count * int32(averange * IN_MILISECONDS) / m_caster->GetAttackTime(BASE_ATTACK);
+                    damage += count * int32(average * IN_MILISECONDS) / m_caster->GetAttackTime(BASE_ATTACK);
                 }
                 // Shield of Righteousness
                 else if(m_spellInfo->SpellFamilyFlags&0x0010000000000000LL)
@@ -1589,14 +1599,7 @@ void Spell::EffectDummy(uint32 i)
 
             switch(m_spellInfo->Id)
             {
-                // Judgement of Righteousness (0.2*$AP+0.32*$SPH) holy added in spellDamagBonus
-                case 20187:
-                {
-                    if (!unitTarget)
-                        return;
-                    m_damage+=int32(0.2f*m_caster->GetTotalAttackPowerValue(BASE_ATTACK));
-                    return;
-                }
+
                 case 31789:                                 // Righteous Defense (step 1)
                 {
                     // 31989 -> dummy effect (step 1) + dummy effect (step 2) -> 31709 (taunt like spell for each target)
@@ -2661,7 +2664,11 @@ void Spell::DoCreateItem(uint32 i, uint32 itemtype)
 
         // send info to the client
         if(pItem)
+        {
+            if(itemTarget && (itemTarget->IsArmorVellum() || itemTarget->IsWeaponVellum()))
+               player->DestroyItemCount(itemTarget->GetEntry(), 1, true);
             player->SendNewItem(pItem, num_to_add, true, true);
+        }
 
         // we succeeded in creating at least one item, so a levelup is possible
         player->UpdateCraftSkill(m_spellInfo->Id);
@@ -2981,6 +2988,10 @@ void Spell::EffectOpenLock(uint32 effIndex)
                 return;
             }
         }
+        // handle outdoor pvp object opening, return true if go was registered for handling
+        // these objects must have been spawned by outdoorpvp!
+        else if(gameObjTarget->GetGOInfo()->type == GAMEOBJECT_TYPE_GOOBER && sOutdoorPvPMgr.HandleOpenGo(player, gameObjTarget->GetGUID()))
+            return;
         lockId = gameObjTarget->GetLockId();
         guid = gameObjTarget->GetGUID();
     }
@@ -3284,6 +3295,7 @@ void Spell::EffectSummon(uint32 i)
 
     spawnCreature->AIM_Initialize();
     spawnCreature->InitPetCreateSpells();
+    spawnCreature->InitLevelupSpellsForLevel();
     spawnCreature->SetHealth(spawnCreature->GetMaxHealth());
     spawnCreature->SetPower(POWER_MANA, spawnCreature->GetMaxPower(POWER_MANA));
 
@@ -3804,6 +3816,19 @@ void Spell::EffectEnchantItemPerm(uint32 effect_idx)
     if(!pEnchant)
         return;
 
+    ItemPrototype const* targetProto = itemTarget->GetProto();
+    // EffectItemType serves as the entry of the item to be created.
+    if(m_spellInfo->EffectItemType[effect_idx])
+    {
+        if((m_spellInfo->EquippedItemClass == ITEM_CLASS_ARMOR && itemTarget->IsArmorVellum()) ||
+           (m_spellInfo->EquippedItemClass == ITEM_CLASS_WEAPON && itemTarget->IsWeaponVellum()))
+        {
+             unitTarget = m_caster;
+             DoCreateItem(effect_idx,m_spellInfo->EffectItemType[effect_idx]);
+             return;
+        }
+    }
+    
     // item can be in trade slot and have owner diff. from caster
     Player* item_owner = itemTarget->GetOwner();
     if(!item_owner)
@@ -4196,6 +4221,7 @@ void Spell::EffectSummonPet(uint32 i)
 
     NewSummon->InitStatsForLevel(petlevel);
     NewSummon->InitPetCreateSpells();
+    NewSummon->InitLevelupSpellsForLevel();
     NewSummon->InitTalentForLevel();
 
     if(NewSummon->getPetType()==SUMMON_PET)
@@ -4404,8 +4430,8 @@ void Spell::EffectWeaponDmg(uint32 i)
         }
         case SPELLFAMILY_DEATHKNIGHT:
         {
-            // Obliterate and Heart Strike
-            if(m_spellInfo->SpellFamilyFlags & 0x0002000001000000LL)
+            // Obliterate, Heart Strike, Scourge Strike
+            if(m_spellInfo->SpellFamilyFlags & 0x0802000001000000LL)
             {
                 uint32 diseases = 0;
                 Unit::AuraMap& allAuras = unitTarget->GetAuras();
@@ -4414,7 +4440,7 @@ void Spell::EffectWeaponDmg(uint32 i)
                     next = iter;
                     ++next;
                     SpellEntry const *aurSpellInfo = iter->second->GetSpellProto();
-                    if(GetAllSpellMechanicMask(aurSpellInfo) & (1<<MECHANIC_INFECTED) && iter->second->GetCaster() == m_caster)
+                    if(aurSpellInfo->Dispel == DISPEL_DISEASE && iter->second->GetCaster() == m_caster)
                     {
                         ++diseases;
                         // Obliterate consumes diseases
@@ -4433,6 +4459,7 @@ void Spell::EffectWeaponDmg(uint32 i)
                     switch(m_spellInfo->SpellIconID)
                     {
                         case 2639: totalDamagePercentMod *= (1 + 0.125f * diseases); break;
+                        case 3143:
                         case 3145: spell_bonus += int32((damage * 15 / 100) * diseases); break;
                         default: break;
                     }
@@ -5845,9 +5872,18 @@ void Spell::EffectMomentMove(uint32 i)
             fx = fx2;
             fy = fy2;
             fz = fz2;
-            unitTarget->UpdateGroundPositionZ(fx,fy,fz);
         }
 
+        if(unitTarget->GetTypeId() == TYPEID_PLAYER)
+        {
+            fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,fz,true);
+            if (fabs(fz-oz) > 4.0f)
+            {
+                fx = ox;
+                fy = oy;
+                fz = oz;
+            }
+        }  
         unitTarget->NearTeleportTo(fx, fy, fz, unitTarget->GetOrientation(),unitTarget==m_caster);
     }
 }
@@ -6030,6 +6066,7 @@ void Spell::EffectSummonCritter(uint32 i)
 
     critter->AIM_Initialize();
     critter->InitPetCreateSpells();                         // e.g. disgusting oozeling has a create spell as critter...
+    //critter->InitLevelupSpellsForLevel();                 // none?
     critter->SelectLevel(critter->GetCreatureInfo());       // some summoned creaters have different from 1 DB data for level/hp
     critter->SetUInt32Value(UNIT_NPC_FLAGS, critter->GetCreatureInfo()->npcflag);
                                                             // some mini-pets have quests

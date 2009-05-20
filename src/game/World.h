@@ -406,7 +406,7 @@ class World
         /// Get the current Message of the Day
         const char* GetMotd() const { return m_motd.c_str(); }
 
-        uint32 GetDefaultDbcLocale() const { return m_defaultDbcLocale; }
+        LocaleConstant GetDefaultDbcLocale() const { return m_defaultDbcLocale; }
 
         /// Get the path where data (dbc, maps) are stored on disk
         std::string GetDataPath() const { return m_dataPath; }
@@ -472,7 +472,6 @@ class World
         bool IsPvPRealm() { return (getConfig(CONFIG_GAME_TYPE) == REALM_TYPE_PVP || getConfig(CONFIG_GAME_TYPE) == REALM_TYPE_RPPVP || getConfig(CONFIG_GAME_TYPE) == REALM_TYPE_FFA_PVP); }
         bool IsFFAPvPRealm() { return getConfig(CONFIG_GAME_TYPE) == REALM_TYPE_FFA_PVP; }
 
-        bool KickPlayer(const std::string& playerName);
         void KickAll();
         void KickAllLess(AccountTypes sec);
         BanReturn BanAccount(BanMode mode, std::string nameOrIP, std::string duration, std::string reason, std::string author);
@@ -557,7 +556,7 @@ class World
         static float m_VisibleObjectGreyDistance;
 
         // CLI command holder to be thread safe
-		ACE_Based::LockedQueue<CliCommandHolder*,ACE_Thread_Mutex> cliCmdQueue;
+        ACE_Based::LockedQueue<CliCommandHolder*,ACE_Thread_Mutex> cliCmdQueue;
         SqlResultQueue *m_resultQueue;
 
         // next daily quests reset time
@@ -568,7 +567,7 @@ class World
 
         //sessions that are added async
         void AddSession_(WorldSession* s);
-		ACE_Based::LockedQueue<WorldSession*, ACE_Thread_Mutex> addSessQueue;
+        ACE_Based::LockedQueue<WorldSession*, ACE_Thread_Mutex> addSessQueue;
 
         //used versions
         std::string m_DBVersion;

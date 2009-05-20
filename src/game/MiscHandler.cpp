@@ -37,8 +37,10 @@
 #include "ObjectAccessor.h"
 #include "Object.h"
 #include "BattleGround.h"
+#include "SpellAuras.h"
 #include "Pet.h"
 #include "SocialMgr.h"
+#include "OutdoorPvP.h"
 
 void WorldSession::HandleRepopRequestOpcode( WorldPacket & /*recv_data*/ )
 {
@@ -373,6 +375,11 @@ void WorldSession::HandleTogglePvP( WorldPacket & recv_data )
         if(!GetPlayer()->pvpInfo.inHostileArea && GetPlayer()->IsPvP())
             GetPlayer()->pvpInfo.endTimer = time(NULL);     // start toggle-off
     }
+
+    if(OutdoorPvP * pvp = _player->GetOutdoorPvP())
+    {
+        pvp->HandlePlayerActivityChanged(_player);
+    }
 }
 
 void WorldSession::HandleZoneUpdateOpcode( WorldPacket & recv_data )
@@ -674,9 +681,7 @@ void WorldSession::HandleCorpseReclaimOpcode(WorldPacket &recv_data)
     if(corpse->GetGhostTime() + GetPlayer()->GetCorpseReclaimDelay(corpse->GetType()==CORPSE_RESURRECTABLE_PVP) > time(NULL))
         return;
 
-    float dist = corpse->GetDistance2d(GetPlayer());
-    sLog.outDebug("Corpse 2D Distance: \t%f",dist);
-    if (dist > CORPSE_RECLAIM_RADIUS)
+    if (!corpse->IsWithinDist(GetPlayer(),CORPSE_RECLAIM_RADIUS,false))
         return;
 
     uint64 guid;
@@ -821,6 +826,12 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPacket & recv_data)
                 bg->HandleAreaTrigger(GetPlayer(), Trigger_ID);
 
         return;
+    }
+
+    if(OutdoorPvP * pvp = GetPlayer()->GetOutdoorPvP())
+    {
+        if(pvp->HandleAreaTrigger(_player, Trigger_ID))
+            return;
     }
 
     // NULL if all values default (non teleport trigger)

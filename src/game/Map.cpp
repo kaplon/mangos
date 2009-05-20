@@ -2497,7 +2497,16 @@ void InstanceMap::UnloadAll(bool pForce)
         }
     }
 
-    if(m_resetAfterUnload == true)
+    bool instanceHasId = false;
+
+    QueryResult *result = CharacterDatabase.PQuery("SELECT id FROM instance WHERE id = '%d' AND map = '%d' AND difficulty = '%d'", GetInstanceId(), GetId(), GetSpawnMode());
+    if(result)
+    {
+        instanceHasId = true;
+        delete result;
+    }
+
+    if(m_resetAfterUnload == true && instanceHasId == false)
         objmgr.DeleteRespawnTimeForInstance(GetInstanceId());
 
     Map::UnloadAll(pForce);

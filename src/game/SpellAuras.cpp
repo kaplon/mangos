@@ -38,6 +38,8 @@
 #include "Creature.h"
 #include "Formulas.h"
 #include "BattleGround.h"
+#include "OutdoorPvP.h"
+#include "OutdoorPvPMgr.h"
 #include "CreatureAI.h"
 #include "ScriptCalls.h"
 #include "Util.h"
@@ -240,7 +242,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandleNoImmediateEffect,                         //187 SPELL_AURA_MOD_ATTACKER_MELEE_CRIT_CHANCE  implemented in Unit::GetUnitCriticalChance
     &Aura::HandleNoImmediateEffect,                         //188 SPELL_AURA_MOD_ATTACKER_RANGED_CRIT_CHANCE implemented in Unit::GetUnitCriticalChance
     &Aura::HandleModRating,                                 //189 SPELL_AURA_MOD_RATING
-    &Aura::HandleNULL,                                      //190 SPELL_AURA_MOD_FACTION_REPUTATION_GAIN
+    &Aura::HandleNoImmediateEffect,                         //190 SPELL_AURA_MOD_FACTION_REPUTATION_GAIN     implemented in Player::CalculateReputationGain
     &Aura::HandleAuraModUseNormalSpeed,                     //191 SPELL_AURA_USE_NORMAL_MOVEMENT_SPEED
     &Aura::HandleModMeleeRangedSpeedPct,                    //192 SPELL_AURA_HASTE_MELEE
     &Aura::HandleModCombatSpeedPct,                         //193 SPELL_AURA_MELEE_SLOW (in fact combat (any type attack) speed pct)
@@ -1075,6 +1077,7 @@ void Aura::_RemoveAura()
             m_target->ModifyAuraState(AURA_STATE_ENRAGE, false);
 
         uint32 removeState = 0;
+        uint64 removeFamilyFlag = m_spellProto->SpellFamilyFlags;
         switch(m_spellProto->SpellFamilyName)
         {
             case SPELLFAMILY_PALADIN:
@@ -1089,7 +1092,10 @@ void Aura::_RemoveAura()
                 if(m_spellProto->SpellFamilyFlags & 0x0000000000000400LL)
                     removeState = AURA_STATE_FAERIE_FIRE;   // Faerie Fire (druid versions)
                 else if(m_spellProto->SpellFamilyFlags & 0x50)
+                {
+                    removeFamilyFlag = 0x50;
                     removeState = AURA_STATE_SWIFTMEND;     // Swiftmend aura state
+                }
                 break;
             case SPELLFAMILY_WARRIOR:
                 if(m_spellProto->SpellFamilyFlags & 0x0004000000000000LL)
@@ -1113,7 +1119,7 @@ void Aura::_RemoveAura()
             {
                 SpellEntry const *auraSpellInfo = (*i).second->GetSpellProto();
                 if(auraSpellInfo->SpellFamilyName  == m_spellProto->SpellFamilyName &&
-                   auraSpellInfo->SpellFamilyFlags == m_spellProto->SpellFamilyFlags )
+                   auraSpellInfo->SpellFamilyFlags & removeFamilyFlag)
                 {
                     found = true;
                     break;
@@ -2294,6 +2300,9 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                 ((Player*)m_target)->AddSpellMod(m_spellmod, apply);
                 return;
             }
+		 case 48384: if(apply)m_target->CastSpell(m_target,50170,true); return; //Rank 1
+		 case 48395: if(apply)m_target->CastSpell(m_target,50171,true); return; //Rank 2
+		 case 48396: if(apply)m_target->CastSpell(m_target,50172,true); return; //Rank 3
             break;
         }
         case SPELLFAMILY_DRUID:
@@ -3541,6 +3550,13 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 pTarget->SetVisibility(VISIBILITY_GROUP_STEALTH);
             }
 
+            // remove player from the objective's active player count at stealth
+            if(pTarget->GetTypeId() == TYPEID_PLAYER)
+            {
+                if(OutdoorPvP * pvp = ((Player*)pTarget)->GetOutdoorPvP())
+                    pvp->HandlePlayerActivityChanged((Player*)pTarget);
+            }
+
             // apply full stealth period bonuses only at first stealth aura in stack
             if(pTarget->GetAurasByType(SPELL_AURA_MOD_STEALTH).size()<=1)
             {
@@ -3585,6 +3601,12 @@ void Aura::HandleModStealth(bool apply, bool Real)
                 }
                 else
                     pTarget->SetVisibility(VISIBILITY_ON);
+
+                if(pTarget->GetTypeId() == TYPEID_PLAYER)
+                {
+                    if(OutdoorPvP * pvp = ((Player*)pTarget)->GetOutdoorPvP())
+                       pvp->HandlePlayerActivityChanged((Player*)pTarget);
+                }
             }
 
             // apply delayed talent bonus remover at last stealth aura remove
@@ -3614,6 +3636,9 @@ void Aura::HandleInvisibility(bool apply, bool Real)
         {
             // apply glow vision
             m_target->SetFlag(PLAYER_FIELD_BYTES2,PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW);
+            // remove player from the objective's active player count at invisibility
+            if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                pvp->HandlePlayerActivityChanged((Player*)m_target);
 
         }
 
@@ -3646,6 +3671,13 @@ void Aura::HandleInvisibility(bool apply, bool Real)
                 // if have stealth aura then already have stealth visibility
                 if(!m_target->HasAuraType(SPELL_AURA_MOD_STEALTH))
                     m_target->SetVisibility(VISIBILITY_ON);
+                if(m_target->GetTypeId() == TYPEID_PLAYER)
+                {
+                    if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+                        pvp->HandlePlayerActivityChanged((Player*)m_target);
+
+                    m_target->SendUpdateToPlayer((Player*)m_target);
+                }
             }
         }
     }
@@ -4073,10 +4105,15 @@ void Aura::HandleAuraModEffectImmunity(bool apply, bool /*Real*/)
     {
         if( BattleGround *bg = ((Player*)m_target)->GetBattleGround() )
             bg->EventPlayerDroppedFlag(((Player*)m_target));
-    }
+		else if(OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
+            sOutdoorPvPMgr.HandleDropFlag((Player*)m_target,GetSpellProto()->Id);
+
+	}
 
     m_target->ApplySpellImmune(GetId(),IMMUNITY_EFFECT,m_modifier.m_miscvalue,apply);
 }
+
+
 
 void Aura::HandleAuraModStateImmunity(bool apply, bool Real)
 {
@@ -4252,7 +4289,7 @@ void Aura::HandleAuraPeriodicDummy(bool apply, bool Real)
         {
             // Explosive Shot
             if (apply && !loading && caster)
-                m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(RANGED_ATTACK) * 8 / 100);
+                m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(RANGED_ATTACK) * 16 / 100);
             break;
         }
     }
@@ -5794,6 +5831,8 @@ void Aura::PeriodicTick()
                         pdamage += (pdamage+1)/2;           // +1 prevent 0.5 damage possible lost at 1..4 ticks
                     // 5..8 ticks have normal tick damage
                 }
+                else if(GetId() == 31803)
+                    pdamage = int32((pCaster->GetTotalAttackPowerValue(BASE_ATTACK) * 15 / 100) + (pCaster->SpellBaseDamageBonus(SPELL_SCHOOL_MASK_HOLY) * 88 / 1000));
             }
             else
                 pdamage = uint32(m_target->GetMaxHealth()*amount/100);
@@ -6540,14 +6579,7 @@ void Aura::PeriodicDummyTick()
                 if (!caster)
                     return;
                 int32 damage = m_modifier.m_amount;
-                // Full damage to target at 0 tick
-                if (m_duration > m_modifier.periodictime)
-                {
-                    caster->CastCustomSpell(m_target, 53352, &damage, 0, 0, true, 0, this);
-                    return;
-                }
-                damage/=4;
-                caster->CastCustomSpell(m_target, 56298, &damage, 0, 0, true, 0, this);
+                caster->CastCustomSpell(m_target, 53352, &damage, 0, 0, true, 0, this);
                 return;
             }
             switch (spell->Id)

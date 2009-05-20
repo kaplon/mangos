@@ -562,6 +562,7 @@ enum NPCFlags
     UNIT_NPC_FLAG_GUILD_BANKER          = 0x00800000,       // cause client to send 997 opcode
     UNIT_NPC_FLAG_SPELLCLICK            = 0x01000000,       // cause client to send 1015 opcode (spell click)
     UNIT_NPC_FLAG_GUARD                 = 0x10000000,       // custom flag for guards
+    UNIT_NPC_FLAG_OUTDOORPVP            = 0x20000000,       // custom flag for outdoor pvp creatures
 };
 
 enum MovementFlags
@@ -1042,7 +1043,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
 
         bool isFrozen() const;
 
-        void RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage);
+        void RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage, Unit *pCaster);
 
         bool isTargetableForAttack() const;
         virtual bool IsInWater() const;
@@ -1240,9 +1241,9 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         float GetWeaponDamageRange(WeaponAttackType attType ,WeaponDamageRange type) const;
         void SetBaseWeaponDamage(WeaponAttackType attType ,WeaponDamageRange damageRange, float value) { m_weaponDamage[attType][damageRange] = value; }
 
-        bool isInFront(Unit const* target,float distance, float arc = M_PI) const;
+        bool isInFrontInMap(Unit const* target,float distance, float arc = M_PI) const;
         void SetInFront(Unit const* target);
-        bool isInBack(Unit const* target, float distance, float arc = M_PI) const;
+        bool isInBackInMap(Unit const* target, float distance, float arc = M_PI) const;
 
         // Visibility system
         UnitVisibility GetVisibility() const { return m_Visibility; }

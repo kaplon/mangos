@@ -41,6 +41,7 @@
 #include "BattleGround.h"
 #include "InstanceSaveMgr.h"
 #include "GridNotifiersImpl.h"
+#include "OutdoorPvP.h"
 #include "CellImpl.h"
 #include "Path.h"
 #include "Traveller.h"
@@ -355,13 +356,31 @@ bool Unit::HasAuraType(AuraType auraType) const
 }
 
 /* Called by DealDamage for auras that have a chance to be dispelled on damage taken. */
-void Unit::RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage)
+void Unit::RemoveSpellbyDamageTaken(AuraType auraType, uint32 damage, Unit *pCaster)
 {
+    if (!pCaster)
+        return;
+
     if(!HasAuraType(auraType))
         return;
 
     // The chance to dispel an aura depends on the damage taken with respect to the casters level.
-    uint32 max_dmg = getLevel() > 8 ? 25 * getLevel() - 150 : 50;
+    uint32 max_dmg = pCaster->getLevel() > 8 ? 25 * getLevel() - 150 : 50;
+
+    // Glyph of Fear and Glyph of Entangling Roots bonus
+    if (pCaster->GetTypeId() == TYPEID_PLAYER)
+    {
+        AuraList const& m_OverrideClassScript = pCaster->GetAurasByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
+        for (AuraList::const_iterator citr = m_OverrideClassScript.begin(); citr != m_OverrideClassScript.end(); ++citr)
+        {
+            if ((*citr)->GetModifier()->m_miscvalue == 7801)
+            {
+                max_dmg = int32(max_dmg * (100.0f + (*citr)->GetModifier()->m_amount) / 100.0f);
+                break;
+            }
+        }
+    }
+
     float chance = float(damage) / max_dmg * 100.0f;
     if (roll_chance_f(chance))
         RemoveSpellsCausingAura(auraType);
@@ -431,10 +450,10 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
         return 0;
     }
     if (!spellProto || !IsAuraAddedBySpell(SPELL_AURA_MOD_FEAR, spellProto->Id))
-        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_FEAR, damage);
+        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_FEAR, damage, this);
     // root type spells do not dispel the root effect
     if (!spellProto || !(spellProto->Mechanic == MECHANIC_ROOT || IsAuraAddedBySpell(SPELL_AURA_MOD_ROOT, spellProto->Id)))
-        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_ROOT, damage);
+        pVictim->RemoveSpellbyDamageTaken(SPELL_AURA_MOD_ROOT, damage, this);
 
     // no xp,health if type 8 /critters/
     if(pVictim->GetTypeId() != TYPEID_PLAYER && pVictim->GetCreatureType() == CREATURE_TYPE_CRITTER)
@@ -585,6 +604,24 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
         DEBUG_LOG("SET JUST_DIED");
         if(!spiritOfRedemtionTalentReady)
             pVictim->setDeathState(JUST_DIED);
+
+        // outdoor pvp things, do these after setting the death state, else the player activity notify won't work... doh...
+        // handle player kill only if not suicide (spirit of redemption for example)
+        if(GetTypeId() == TYPEID_PLAYER && this != pVictim)
+        {
+            if(OutdoorPvP * pvp = ((Player*)this)->GetOutdoorPvP())
+            {
+                pvp->HandleKill((Player*)this,pVictim);
+            }
+        }
+
+        if(pVictim->GetTypeId() == TYPEID_PLAYER)
+        {
+            if(OutdoorPvP * pvp = ((Player*)pVictim)->GetOutdoorPvP())
+            {
+                pvp->HandlePlayerActivityChanged((Player*)pVictim);
+            }
+        }
 
         DEBUG_LOG("DealDamageHealth1");
 
@@ -1744,15 +1781,13 @@ void Unit::CalcAbsorbResist(Unit *pVictim,SpellSchoolMask schoolMask, DamageEffe
                     preventDeathAmount = (*i)->GetModifier()->m_amount;
                     continue;
                 }
+                Unit* caster = (*i)->GetCaster();
+                               if (!caster)
+                                       break;
 
                 // Reflective Shield
-                if (spellProto->SpellFamilyFlags == 0x1)
+                if (spellProto->SpellFamilyFlags == 0x1 && pVictim != this)
                 {
-                    if (pVictim == this)
-                        break;
-                    Unit* caster = (*i)->GetCaster();
-                    if (!caster)
-                        break;
                     AuraList const& vOverRideCS = caster->GetAurasByType(SPELL_AURA_DUMMY);
                     for(AuraList::const_iterator k = vOverRideCS.begin(); k != vOverRideCS.end(); ++k)
                     {
@@ -1771,7 +1806,33 @@ void Unit::CalcAbsorbResist(Unit *pVictim,SpellSchoolMask schoolMask, DamageEffe
                             default: break;
                         }
                     }
-                    break;
+                }
+                               // Rapture
+                               if (spellProto->SpellFamilyFlags & 0x1 || spellProto->SpellFamilyFlags2 & 0x400)
+                {
+                    AuraList const& vOverRideCS = caster->GetAurasByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
+                    for(AuraList::const_iterator k = vOverRideCS.begin(); k != vOverRideCS.end(); ++k)
+                    {
+                        switch((*k)->GetModifier()->m_miscvalue)
+                        {
+                            case 7552:                          // Rank 5
+                            case 7553:                          // Rank 4
+                            case 7554:                          // Rank 3
+                            case 7555:                          // Rank 2
+                            case 7556:                          // Rank 1
+                            {
+                                                               int32 manaRestore = RemainingDamage >= currentAbsorb ? currentAbsorb : RemainingDamage;
+                                                               //max possible amount
+                                                               int32 max = caster->GetMaxPower(POWER_MANA) * (*k)->GetModifier()->m_amount/1000;
+                                                               //amount
+                                                               manaRestore *= int32((*k)->GetModifier()->m_amount/25 * 0.000004f *caster->GetMaxPower(POWER_MANA));
+                                                               manaRestore = manaRestore > max ? max : manaRestore;
+
+                                                               caster->CastCustomSpell(caster,47755,&manaRestore,NULL,NULL,true,NULL,(*k));
+                                                       }break;
+                            default: break;
+                        }
+                    }
                 }
                 break;
             }
@@ -2304,6 +2365,9 @@ uint32 Unit::CalculateDamage (WeaponAttackType attType, bool normalized)
 float Unit::CalculateLevelPenalty(SpellEntry const* spellProto) const
 {
     if(spellProto->spellLevel <= 0)
+        return 1.0f;
+// unstable affliction trigger
+    if(spellProto->Id == 31117)
         return 1.0f;
 
     float LvlPenalty = 0.0f;
@@ -3200,7 +3264,7 @@ Spell* Unit::FindCurrentSpellBySpellId(uint32 spell_id) const
     return NULL;
 }
 
-bool Unit::isInFront(Unit const* target, float distance,  float arc) const
+bool Unit::isInFrontInMap(Unit const* target, float distance,  float arc) const
 {
     return IsWithinDistInMap(target, distance) && HasInArc( arc, target );
 }
@@ -3210,7 +3274,7 @@ void Unit::SetInFront(Unit const* target)
     SetOrientation(GetAngle(target));
 }
 
-bool Unit::isInBack(Unit const* target, float distance, float arc) const
+bool Unit::isInBackInMap(Unit const* target, float distance, float arc) const
 {
     return IsWithinDistInMap(target, distance) && !HasInArc( 2 * M_PI - arc, target );
 }
@@ -5082,8 +5146,10 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
             switch(dummySpell->Id)
             {
                 // Nightfall
+                // 56218 proc from glyph of corruption
                 case 18094:
                 case 18095:
+                case 56218:
                 {
                     target = this;
                     triggered_spell_id = 17941;
@@ -5151,6 +5217,16 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 triggered_spell_id = 47753;
                 break;
             }
+            // Rapture Proc (from heal)
+           if( dummySpell->SpellIconID == 2894 )
+           {
+               //max possible amount
+               int32 max = GetMaxPower(POWER_MANA) * 5*triggerAmount/1000;
+               //amount
+               basepoints0 = int32(triggerAmount/5 * 0.000004f * damage*GetMaxPower(POWER_MANA));
+               basepoints0 = basepoints0 > max ? max : basepoints0;
+               triggered_spell_id = 47755;
+           }
             switch(dummySpell->Id)
             {
                 // Vampiric Embrace
@@ -5457,6 +5533,16 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
         }
         case SPELLFAMILY_PALADIN:
         {
+	//Judgements of the wise 
+	if ( dummySpell->SpellIconID==3017 )
+	{
+			target = this;
+			triggered_spell_id =31930;
+			basepoints0 = GetCreateMana() * 0.15;
+			CastSpell ( this,57669,true,NULL,GetDummyAura ( dummySpell->Id ),GetGUID() );
+		break;
+	}
+
             // Seal of Righteousness - melee proc dummy (addition ${$MWS*(0.022*$AP+0.044*$SPH)} damage)
             if (dummySpell->SpellFamilyFlags&0x000000008000000LL && effIndex==0)
             {
@@ -5974,7 +6060,7 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                             default:
                                 return false;
                         }
-                        CastSpell(this, spell, true, castItem, triggeredByAura);
+                        CastSpell(target, spell, true, castItem, triggeredByAura);
                         if ((*itr)->DropAuraCharge())
                             RemoveAurasDueToSpell((*itr)->GetId());
                         return true;
@@ -8070,7 +8156,16 @@ bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolM
                             break;
                         }
                     break;
-
+                    case SPELLFAMILY_DRUID:
+                        //Improved Insect Swarm
+                        if (spellProto->SpellFamilyFlags & 0x0000000000000004LL && spellProto->SpellIconID == 1485)
+                        {
+                         Aura *ImprovedAura =  HasAura(57849) ? GetAura(57849,1) : HasAura(57850) ? GetAura(57850,1) : HasAura(57851) ? GetAura(57851,1) : NULL;
+                         if(ImprovedAura && pVictim->GetAura(SPELL_AURA_PERIODIC_DAMAGE,SPELLFAMILY_DRUID,0x0000000000000002LL))
+                            crit_chance+=ImprovedAura->GetModifier()->m_amount;
+                            break;
+                        }
+                    break;
                 }
             }
             break;
@@ -9093,9 +9188,7 @@ bool Unit::isVisibleForOrDetect(Unit const* u, bool detect, bool inVisibleList, 
         return true;
 
     // If there is collision rogue is seen regardless of level difference
-    // TODO: check sizes in DB
-    float distance = GetDistance(u);
-    if (distance < 0.24f)
+    if (IsWithinDist(u,0.24f))
         return true;
 
     //If a mob or player is stunned he will not be able to detect stealth
@@ -9106,14 +9199,14 @@ bool Unit::isVisibleForOrDetect(Unit const* u, bool detect, bool inVisibleList, 
     if(u->GetTypeId() != TYPEID_PLAYER)
     {
         //Always invisible from back and out of aggro range
-        bool isInFront = u->isInFront(this,((Creature const*)u)->GetAttackDistance(this));
+        bool isInFront = u->isInFrontInMap(this,((Creature const*)u)->GetAttackDistance(this));
         if(!isInFront)
             return false;
     }
     else
     {
         //Always invisible from back
-        bool isInFront = u->isInFront(this,(GetTypeId()==TYPEID_PLAYER || GetCharmerOrOwnerGUID()) ? World::GetMaxVisibleDistanceForPlayer() : World::GetMaxVisibleDistanceForCreature());
+        bool isInFront = u->isInFrontInMap(this,(GetTypeId()==TYPEID_PLAYER || GetCharmerOrOwnerGUID()) ? World::GetMaxVisibleDistanceForPlayer() : World::GetMaxVisibleDistanceForCreature());
         if(!isInFront)
             return false;
     }
@@ -9139,7 +9232,7 @@ bool Unit::isVisibleForOrDetect(Unit const* u, bool detect, bool inVisibleList, 
         //based on wowwiki every 5 mod we have 1 more level diff in calculation
         visibleDistance += (int32(u->GetTotalAuraModifier(SPELL_AURA_MOD_DETECT)) - stealthMod)/5.0f;
 
-        if(distance > visibleDistance)
+        if(!IsWithinDist(u,visibleDistance))
             return false;
     }
 
@@ -10421,20 +10514,30 @@ void CharmInfo::InitCharmCreateSpells()
 
 bool CharmInfo::AddSpellToAB(uint32 oldid, uint32 newid, ActiveStates newstate)
 {
+    // new spell already listed for example in case prepered switch to lesser rank in Pet::removeSpell
+    for(uint8 i = 0; i < 10; ++i)
+        if (PetActionBar[i].Type == ACT_DISABLED || PetActionBar[i].Type == ACT_ENABLED || PetActionBar[i].Type == ACT_PASSIVE)
+            if (newid && PetActionBar[i].SpellOrAction == newid)
+                return true;
+
+    // old spell can be leasted for example in case learn high rank
     for(uint8 i = 0; i < 10; ++i)
     {
-        if((PetActionBar[i].Type == ACT_DISABLED || PetActionBar[i].Type == ACT_ENABLED || PetActionBar[i].Type == ACT_PASSIVE) && PetActionBar[i].SpellOrAction == oldid)
+        if (PetActionBar[i].Type == ACT_DISABLED || PetActionBar[i].Type == ACT_ENABLED || PetActionBar[i].Type == ACT_PASSIVE)
         {
-            PetActionBar[i].SpellOrAction = newid;
-            if(!oldid)
+            if (PetActionBar[i].SpellOrAction == oldid)
             {
-                if(newstate == ACT_DECIDE)
-                    PetActionBar[i].Type = ACT_DISABLED;
-                else
-                    PetActionBar[i].Type = newstate;
-            }
+                PetActionBar[i].SpellOrAction = newid;
+                if (!oldid)
+                {
+                    if (newstate == ACT_DECIDE)
+                        PetActionBar[i].Type = ACT_DISABLED;
+                    else
+                        PetActionBar[i].Type = newstate;
+                }
 
-            return true;
+                return true;
+            }
         }
     }
     return false;
@@ -11424,6 +11527,7 @@ Pet* Unit::CreateTamedPetFrom(Creature* creatureTarget,uint32 spell_id)
     // this enables pet details window (Shift+P)
     pet->AIM_Initialize();
     pet->InitPetCreateSpells();
+    pet->InitLevelupSpellsForLevel();
     pet->InitTalentForLevel();
     pet->SetHealth(pet->GetMaxHealth());
 

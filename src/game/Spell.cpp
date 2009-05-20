@@ -1334,7 +1334,7 @@ struct TargetDistanceOrder : public std::binary_function<const Unit, const Unit,
     // functor for operator ">"
     bool operator()(const Unit* _Left, const Unit* _Right) const
     {
-        return (MainTarget->GetDistance(_Left) < MainTarget->GetDistance(_Right));
+        return MainTarget->GetDistanceOrder(_Left,_Right);
     }
 };
 
@@ -1427,7 +1427,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
             //Now to get us a random target that's in the initial range of the spell
             uint32 t = 0;
             std::list<Unit *>::iterator itr = tempUnitMap.begin();
-            while(itr!= tempUnitMap.end() && (*itr)->GetDistance(m_caster) < radius)
+            while(itr!= tempUnitMap.end() && (*itr)->IsWithinDist(m_caster,radius))
                 ++t, ++itr;
 
             if(!t)
@@ -1448,7 +1448,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
 
             while(t && next != tempUnitMap.end() )
             {
-                if(prev->GetDistance(*next) > CHAIN_SPELL_JUMP_RADIUS)
+                if(!prev->IsWithinDist(*next,CHAIN_SPELL_JUMP_RADIUS))
                     break;
 
                 if(!prev->IsWithinLOSInMap(*next))
@@ -1496,7 +1496,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
             //Now to get us a random target that's in the initial range of the spell
             uint32 t = 0;
             std::list<Unit *>::iterator itr = tempUnitMap.begin();
-            while(itr!= tempUnitMap.end() && (*itr)->GetDistance(m_caster) < radius)
+            while(itr!= tempUnitMap.end() && (*itr)->IsWithinDist(m_caster,radius))
                 ++t, ++itr;
 
             if(!t)
@@ -1517,7 +1517,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
 
             while(t && next != tempUnitMap.end() )
             {
-                if(prev->GetDistance(*next) > CHAIN_SPELL_JUMP_RADIUS)
+                if(!prev->IsWithinDist(*next,CHAIN_SPELL_JUMP_RADIUS))
                     break;
 
                 if(!prev->IsWithinLOSInMap(*next))
@@ -1602,7 +1602,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
 
                     while(t && next != tempUnitMap.end() )
                     {
-                        if(prev->GetDistance(*next) > CHAIN_SPELL_JUMP_RADIUS)
+                        if(!prev->IsWithinDist(*next,CHAIN_SPELL_JUMP_RADIUS))
                             break;
 
                         if(!prev->IsWithinLOSInMap(*next))
@@ -2029,7 +2029,7 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
 
                 while(t && next != tempUnitMap.end() )
                 {
-                    if(prev->GetDistance(*next) > CHAIN_SPELL_JUMP_RADIUS)
+                    if(!prev->IsWithinDist(*next,CHAIN_SPELL_JUMP_RADIUS))
                         break;
 
                     if(!prev->IsWithinLOSInMap(*next))
@@ -2419,18 +2419,19 @@ void Spell::cast(bool skipCheck)
         ((Player*)m_caster)->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_CAST_SPELL, m_spellInfo->Id);
     }
 
+    FillTargetMap();
+
+    if(m_spellState == SPELL_STATE_FINISHED)                // stop cast if spell marked as finish somewhere in FillTargetMap
+    {
+        SetExecutedCurrently(false);
+        return;
+    }
+
     // CAST SPELL
     SendSpellCooldown();
 
     TakePower();
     TakeReagents();                                         // we must remove reagents before HandleEffects to allow place crafted item in same slot
-    FillTargetMap();
-
-    if(m_spellState == SPELL_STATE_FINISHED)                // stop cast if spell marked as finish somewhere in Take*/FillTargetMap
-    {
-        SetExecutedCurrently(false);
-        return;
-    }
 
     SendCastResult(castResult);
     SendSpellGo();                                          // we must send smsg_spell_go packet before m_castItem delete in TakeCastItem()...
@@ -3548,6 +3549,18 @@ void Spell::TakeReagents()
     if (p_caster->CanNoReagentCast(m_spellInfo))
         return;
 
+    if(m_CastItem)
+    {
+        for(int i=0; i<3; ++i)
+        {
+            if(m_spellInfo->EffectItemType[i] == m_CastItem->GetEntry())
+            {
+                p_caster->DestroyItemCount(m_CastItem->GetEntry(), 1, true);
+                return;
+            }
+        }
+    }
+
     for(uint32 x=0;x<8;x++)
     {
         if(m_spellInfo->Reagent[x] <= 0)
@@ -4267,11 +4280,30 @@ SpellCastResult Spell::CheckCast(bool strict)
                     case SUMMON_TYPE_DEMON:
                     case SUMMON_TYPE_SUMMON:
                     {
-                        if(m_caster->GetPetGUID())
-                            return SPELL_FAILED_ALREADY_HAVE_SUMMON;
+                        // Outdoor PvP - Trigger FireBomb
 
-                        if(m_caster->GetCharmGUID())
-                            return SPELL_FAILED_ALREADY_HAVE_CHARM;
+                        // fire bomb trigger, can only be used in halaa opvp when flying on a path from a wyvern roost
+                        // yeah, hacky, I know, but neither item flags, nor spell attributes contained any useable data (or I was unable to find it)
+                        if(m_spellInfo->EffectMiscValue[i] == 18225 && m_caster->GetTypeId() == TYPEID_PLAYER)
+                        {
+                            // if not in halaa or not in flight, cannot be used
+                            if(m_caster->GetAreaId() != 3628 || !m_caster->isInFlight())
+                                return SPELL_FAILED_NOT_HERE;
+
+                            // if not on one of the specific taxi paths, then cannot be used
+                            uint32 src_node = ((Player*)m_caster)->m_taxi.GetTaxiSource();
+                            if( src_node != 103 && src_node != 105 && src_node != 107 && src_node != 109 )
+                                return SPELL_FAILED_NOT_HERE;
+                        }
+                        // Outdoor PvP - Trigger FireBomb end
+                        else
+                        {
+                            if(m_caster->GetPetGUID())
+                                 return SPELL_FAILED_ALREADY_HAVE_SUMMON;
+
+                            if(m_caster->GetCharmGUID())
+                                return SPELL_FAILED_ALREADY_HAVE_CHARM;
+                        }
                         break;
                     }
                 }
@@ -4288,7 +4320,7 @@ SpellCastResult Spell::CheckCast(bool strict)
 
                 break;
             }
-            case SPELL_EFFECT_SUMMON_PET:
+           case SPELL_EFFECT_SUMMON_PET:
             {
                 if(m_caster->GetPetGUID())                  //let warlock do a replacement summon
                 {
@@ -4336,19 +4368,6 @@ SpellCastResult Spell::CheckCast(bool strict)
             case SPELL_EFFECT_LEAP:
             case SPELL_EFFECT_TELEPORT_UNITS_FACE_CASTER:
             {
-                float dis = GetSpellRadius(sSpellRadiusStore.LookupEntry(m_spellInfo->EffectRadiusIndex[i]));
-                float fx = m_caster->GetPositionX() + dis * cos(m_caster->GetOrientation());
-                float fy = m_caster->GetPositionY() + dis * sin(m_caster->GetOrientation());
-                // teleport a bit above terrain level to avoid falling below it
-                float fz = MapManager::Instance().GetBaseMap(m_caster->GetMapId())->GetHeight(fx,fy,m_caster->GetPositionZ(),true);
-                if(fz <= INVALID_HEIGHT)                    // note: this also will prevent use effect in instances without vmaps height enabled
-                    return SPELL_FAILED_TRY_AGAIN;
-
-                float caster_pos_z = m_caster->GetPositionZ();
-                // Control the caster to not climb or drop when +-fz > 8
-                if(!(fz<=caster_pos_z+8 && fz>=caster_pos_z-8))
-                    return SPELL_FAILED_TRY_AGAIN;
-
                 // not allow use this effect at battleground until battleground start
                 if(m_caster->GetTypeId()==TYPEID_PLAYER)
                     if(BattleGround const *bg = ((Player*)m_caster)->GetBattleGround())
@@ -4360,6 +4379,23 @@ SpellCastResult Spell::CheckCast(bool strict)
             {
                 if (m_targets.getUnitTarget()==m_caster)
                     return SPELL_FAILED_BAD_TARGETS;
+                break;
+            }
+            case SPELL_EFFECT_ENCHANT_ITEM:
+            {
+                if(m_spellInfo->EffectItemType[i] && m_targets.getItemTarget())
+                {
+                    if(m_targets.getItemTarget()->IsWeaponVellum() || m_targets.getItemTarget()->IsArmorVellum())
+                    {
+                         ItemPosCountVec dest;
+                         uint8 msg = ((Player*)m_caster)->CanStoreNewItem( NULL_BAG, NULL_SLOT, dest, m_spellInfo->EffectItemType[i], 1 );
+                         if(msg != EQUIP_ERR_OK)
+                         {
+                            ((Player*)m_caster)->SendEquipError( msg, NULL, NULL );
+                            return SPELL_FAILED_DONT_REPORT;
+                         }
+                    }
+                }
                 break;
             }
             default:break;
@@ -4727,10 +4763,9 @@ SpellCastResult Spell::CheckRange(bool strict)
 
     if(m_targets.m_targetMask == TARGET_FLAG_DEST_LOCATION && m_targets.m_destX != 0 && m_targets.m_destY != 0 && m_targets.m_destZ != 0)
     {
-        float dist = m_caster->GetDistance(m_targets.m_destX, m_targets.m_destY, m_targets.m_destZ);
-        if(dist > max_range)
+        if(!m_caster->IsWithinDist3d(m_targets.m_destX, m_targets.m_destY, m_targets.m_destZ,max_range))
             return SPELL_FAILED_OUT_OF_RANGE;
-        if(dist < min_range)
+        if(m_caster->IsWithinDist3d(m_targets.m_destX, m_targets.m_destY, m_targets.m_destZ,min_range))
             return SPELL_FAILED_TOO_CLOSE;
     }
 
@@ -4844,11 +4879,13 @@ SpellCastResult Spell::CheckItems()
 
     Player* p_caster = (Player*)m_caster;
 
+    bool isNoReagentReqCast = m_CastItem ? m_CastItem->GetEntry() == m_spellInfo->EffectItemType[0] : false;
+
     // cast item checks
     if(m_CastItem)
     {
         uint32 itemid = m_CastItem->GetEntry();
-        if( !p_caster->HasItemCount(itemid,1) )
+        if( !p_caster->HasItemCount(itemid,1) && !isNoReagentReqCast)
             return SPELL_FAILED_ITEM_NOT_READY;
 
         ItemPrototype const *proto = m_CastItem->GetProto();
@@ -4921,7 +4958,7 @@ SpellCastResult Spell::CheckItems()
         if(!m_targets.getItemTarget())
             return SPELL_FAILED_ITEM_GONE;
 
-        if(!m_targets.getItemTarget()->IsFitToSpellRequirements(m_spellInfo))
+        if(!m_targets.getItemTarget()->IsFitToSpellRequirements(m_spellInfo) && !isNoReagentReqCast)
             return SPELL_FAILED_EQUIPPED_ITEM_CLASS;
     }
     // if not item target then required item must be equipped
@@ -4953,7 +4990,7 @@ SpellCastResult Spell::CheckItems()
     }
 
     // check reagents (ignore triggered spells with reagents processed by original spell) and special reagent ignore case.
-    if (!m_IsTriggeredSpell && !p_caster->CanNoReagentCast(m_spellInfo))
+    if (!m_IsTriggeredSpell && !p_caster->CanNoReagentCast(m_spellInfo) && !isNoReagentReqCast)
     {
         for(uint32 i=0;i<8;++i)
         {
@@ -5017,7 +5054,7 @@ SpellCastResult Spell::CheckItems()
         else
             TotemCategory -= 1;
     }
-    if(TotemCategory != 0)
+    if(TotemCategory != 0 && !isNoReagentReqCast)
         return SPELL_FAILED_TOTEM_CATEGORY;                 //0x7B
 
     // special checks for spell effects
