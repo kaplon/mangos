@@ -6060,7 +6060,7 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                             default:
                                 return false;
                         }
-                        CastSpell(this, spell, true, castItem, triggeredByAura);
+                        CastSpell(target, spell, true, castItem, triggeredByAura);
                         if ((*itr)->DropAuraCharge())
                             RemoveAurasDueToSpell((*itr)->GetId());
                         return true;
