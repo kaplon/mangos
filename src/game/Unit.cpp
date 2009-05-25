@@ -5633,6 +5633,24 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
 
                     break;
                 }
+                // Light's Beacon
+                case 53651:
+                {
+                    if(!pVictim)
+                        return false;
+
+                    if(Unit* caster = triggeredByAura->GetCaster())
+                    {
+                        Aura * dummy = caster->GetDummyAura(53563);
+                        if(dummy && dummy->GetCasterGUID() == pVictim->GetGUID())
+                        {
+                            triggered_spell_id = 53652;
+                            basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
+                            target = caster;
+                        }
+                    }
+                    break;
+                }
                 // Glyph of Divinity
                 case 54939:
                 {
