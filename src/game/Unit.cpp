@@ -2329,6 +2329,9 @@ float Unit::CalculateLevelPenalty(SpellEntry const* spellProto) const
 {
     if(spellProto->spellLevel <= 0)
         return 1.0f;
+    // unstable affliction trigger
+    if(spellProto->Id == 31117)
+        return 1.0f;
 
     float LvlPenalty = 0.0f;
 
