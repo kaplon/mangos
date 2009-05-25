@@ -3647,7 +3647,7 @@ bool Unit::RemoveNoStackAurasDueToAura(Aura *Aur)
         SpellSpecific i_spellId_spec = GetSpellSpecific(i_spellId);
 
         bool is_sspc = IsSingleFromSpellSpecificPerCaster(spellId_spec,i_spellId_spec);
-        bool is_sspt = IsSingleFromSpellSpecificRanksPerTarget(spellId_spec,i_spellId_spec);
+        bool is_sspt = IsSingleFromSpellSpecificRanksPerTarget(spellProto,i_spellProto);
 
         if( is_sspc && Aur->GetCasterGUID() == (*i).second->GetCasterGUID() )
         {
@@ -3669,7 +3669,7 @@ bool Unit::RemoveNoStackAurasDueToAura(Aura *Aur)
             else
                 next =  m_Auras.begin();
         }
-        else if( is_sspt && Aur->GetCasterGUID() != (*i).second->GetCasterGUID() && spellmgr.IsRankSpellDueToSpell(spellProto, i_spellId) )
+        else if( is_sspt && Aur->GetCasterGUID() != (*i).second->GetCasterGUID() )
         {
             // cannot remove higher rank
             if(CompareAuraRanks(spellId, effIndex, i_spellId, i_effIndex) < 0)
