@@ -2402,6 +2402,8 @@ void Spell::cast(bool skipCheck)
         {
             if (m_spellInfo->SpellFamilyFlags&0x0000000000400080LL)    // Divine Shield, Divine Protection or Hand of Protection
                 m_preCastSpell = 25771;                                // Forbearance
+            else if (m_spellInfo->Id == 31884)
+                m_preCastSpell = 61987;                                // Avenging Wrath Marker
             break;
         }
         case SPELLFAMILY_SHAMAN:
@@ -3749,6 +3751,10 @@ SpellCastResult Spell::CheckCast(bool strict)
 
     if(Unit *target = m_targets.getUnitTarget())
     {
+        // Paladin immunity spells & Avenging wrath
+        if((m_spellInfo->Id == 642 || m_spellInfo->Id == 498 || m_spellInfo->Id == 1022 || m_spellInfo->Id == 5599 || m_spellInfo->Id == 10278) && target->HasAura(61987))
+            return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW;
+
         // target state requirements (not allowed state), apply to self also
         if(m_spellInfo->TargetAuraStateNot && target->HasAuraState(AuraState(m_spellInfo->TargetAuraStateNot)))
             return SPELL_FAILED_TARGET_AURASTATE;
