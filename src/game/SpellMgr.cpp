@@ -1254,6 +1254,16 @@ bool SpellMgr::IsNoStackSpellDueToSpell(uint32 spellId_1, uint32 spellId_2) cons
                 if( (spellInfo_1->SpellFamilyFlags & 0x0000000000010000LL) && (spellInfo_2->SpellVisual[0] == 72 && spellInfo_2->SpellIconID == 1499) ||
                     (spellInfo_2->SpellFamilyFlags & 0x0000000000010000LL) && (spellInfo_1->SpellVisual[0] == 72 && spellInfo_1->SpellIconID == 1499) )
                     return false;
+
+               // Living Bomb & Ignite (Dots)
+               if( (spellInfo_1->SpellFamilyFlags & 0x2000000000000LL) && (spellInfo_2->SpellFamilyFlags & 0x8000000LL) ||
+                   (spellInfo_2->SpellFamilyFlags & 0x2000000000000LL) && (spellInfo_1->SpellFamilyFlags & 0x8000000LL))
+                   return false;
+                
+               // Fireball & Pyroblast (Dots)
+               if( (spellInfo_1->SpellFamilyFlags & 0x1LL) && (spellInfo_2->SpellFamilyFlags & 0x400000LL) ||
+                   (spellInfo_2->SpellFamilyFlags & 0x1LL) && (spellInfo_1->SpellFamilyFlags & 0x400000LL))
+                   return false;                    
             }
             // Detect Invisibility and Mana Shield (multi-family check)
             if( spellInfo_2->Id == 132 && spellInfo_1->SpellIconID == 209 && spellInfo_1->SpellVisual[0] == 968 )
