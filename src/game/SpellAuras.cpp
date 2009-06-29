@@ -4674,6 +4674,9 @@ void Aura::HandleAuraModTotalManaPercentRegen(bool apply, bool /*Real*/)
 
     m_periodicTimer = m_modifier.periodictime;
     m_isPeriodic = apply;
+
+    if( GetId() == 60069 )                  // Dispersion
+        m_modifier.m_miscvalue = 0;
 }
 
 void Aura::HandleModRegen(bool apply, bool /*Real*/)        // eating
