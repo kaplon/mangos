@@ -21,7 +21,7 @@
 
 DROP TABLE IF EXISTS `character_db_version`;
 CREATE TABLE `character_db_version` (
-  `required_7887_01_characters_character_pet` bit(1) default NULL
+  `required_8072_02_characters_characters` bit(1) default NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=FIXED COMMENT='Last applied sql update to DB';
 
 --
@@ -197,6 +197,13 @@ CREATE TABLE `characters` (
   `name` varchar(12) NOT NULL default '',
   `race` tinyint(3) unsigned NOT NULL default '0',
   `class` tinyint(3) unsigned NOT NULL default '0',
+  `gender` TINYINT UNSIGNED NOT NULL default '0',
+  `level` TINYINT UNSIGNED NOT NULL default '0',
+  `xp` INT UNSIGNED NOT NULL default '0',
+  `money` INT UNSIGNED NOT NULL default '0',
+  `playerBytes` INT UNSIGNED NOT NULL default '0',
+  `playerBytes2` INT UNSIGNED NOT NULL default '0',
+  `playerFlags` INT UNSIGNED NOT NULL default '0',
   `position_x` float NOT NULL default '0',
   `position_y` float NOT NULL default '0',
   `position_z` float NOT NULL default '0',
@@ -365,6 +372,49 @@ LOCK TABLES `character_declinedname` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `character_equipmentsets`
+--
+
+DROP TABLE IF EXISTS `character_equipmentsets`;
+CREATE TABLE `character_equipmentsets` (
+  `guid` int(11) NOT NULL default '0',
+  `setguid` bigint(20) NOT NULL auto_increment,
+  `setindex` tinyint(4) NOT NULL default '0',
+  `name` varchar(100) NOT NULL,
+  `iconname` varchar(100) NOT NULL,
+  `item0` int(11) NOT NULL default '0',
+  `item1` int(11) NOT NULL default '0',
+  `item2` int(11) NOT NULL default '0',
+  `item3` int(11) NOT NULL default '0',
+  `item4` int(11) NOT NULL default '0',
+  `item5` int(11) NOT NULL default '0',
+  `item6` int(11) NOT NULL default '0',
+  `item7` int(11) NOT NULL default '0',
+  `item8` int(11) NOT NULL default '0',
+  `item9` int(11) NOT NULL default '0',
+  `item10` int(11) NOT NULL default '0',
+  `item11` int(11) NOT NULL default '0',
+  `item12` int(11) NOT NULL default '0',
+  `item13` int(11) NOT NULL default '0',
+  `item14` int(11) NOT NULL default '0',
+  `item15` int(11) NOT NULL default '0',
+  `item16` int(11) NOT NULL default '0',
+  `item17` int(11) NOT NULL default '0',
+  `item18` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`setguid`),
+  UNIQUE KEY `idx_set` (`guid`,`setguid`,`setindex`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data for table `character_equipmentsets`
+--
+
+LOCK TABLES `character_equipmentsets` WRITE;
+/*!40000 ALTER TABLE `character_equipmentsets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `character_equipmentsets` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `character_gifts`
 --
 
@@ -472,7 +522,6 @@ CREATE TABLE `character_pet` (
   `level` int(11) unsigned NOT NULL default '1',
   `exp` int(11) unsigned NOT NULL default '0',
   `Reactstate` tinyint(1) unsigned NOT NULL default '0',
-  `talentpoints` int(11) unsigned NOT NULL default '0',
   `name` varchar(100) default 'Pet',
   `renamed` tinyint(1) unsigned NOT NULL default '0',
   `slot` int(11) unsigned NOT NULL default '0',

@@ -157,10 +157,10 @@ struct CreatureInfo
 {
     uint32  Entry;
     uint32  HeroicEntry;
-    uint32  DisplayID_A;
-    uint32  DisplayID_A2;
-    uint32  DisplayID_H;
-    uint32  DisplayID_H2;
+    uint32  unk1;
+    uint32  unk2;
+    uint32  DisplayID_A[2];
+    uint32  DisplayID_H[2];
     char*   Name;
     char*   SubName;
     char*   IconName;
@@ -181,15 +181,17 @@ struct CreatureInfo
     float   maxdmg;
     uint32  dmgschool;
     uint32  attackpower;
+    float   dmg_multiplier;
     uint32  baseattacktime;
     uint32  rangeattacktime;
+    uint32  unit_class;                                     // enum Classes. Note only 4 classes are known for creatures.
     uint32  unit_flags;                                     // enum UnitFlags mask values
     uint32  dynamicflags;
     uint32  family;                                         // enum CreatureFamily values (optional)
     uint32  trainer_type;
     uint32  trainer_spell;
-    uint32  classNum;
-    uint32  race;
+    uint32  trainer_class;
+    uint32  trainer_race;
     float   minrangedmg;
     float   maxrangedmg;
     uint32  rangedattackpower;
@@ -214,6 +216,8 @@ struct CreatureInfo
     float   unk16;
     float   unk17;
     bool    RacialLeader;
+    uint32  questItems[4];
+    uint32  movementId;
     bool    RegenHealth;
     uint32  equipmentId;
     uint32  MechanicImmuneMask;
@@ -233,9 +237,13 @@ struct CreatureInfo
             return SKILL_SKINNING;                          // normal case
     }
 
-    bool isTameable() const
+    bool isTameable(bool exotic) const
     {
-        return type == CREATURE_TYPE_BEAST && family != 0 && (type_flags & CREATURE_TYPEFLAGS_TAMEABLE);
+        if(type != CREATURE_TYPE_BEAST || family == 0 || (type_flags & CREATURE_TYPEFLAGS_TAMEABLE)==0)
+            return false;
+
+        // if can tame exotic then can tame any temable
+        return exotic || (type_flags & CREATURE_TYPEFLAGS_EXOTIC)==0;
     }
 };
 
@@ -295,7 +303,6 @@ struct CreatureDataAddon
 {
     uint32 guidOrEntry;
     uint32 mount;
-    uint32 bytes0;
     uint32 bytes1;
     uint32 bytes2;
     uint32 emote;
@@ -443,7 +450,7 @@ typedef std::map<uint32,time_t> CreatureSpellCooldowns;
 // max different by z coordinate for creature aggro reaction
 #define CREATURE_Z_ATTACK_RANGE 3
 
-#define MAX_VENDOR_ITEMS 255                                // Limitation in item count field size in SMSG_LIST_INVENTORY
+#define MAX_VENDOR_ITEMS 150                                // Limitation in 3.x.x item count in SMSG_LIST_INVENTORY
 
 class MANGOS_DLL_SPEC Creature : public Unit
 {
@@ -510,8 +517,17 @@ class MANGOS_DLL_SPEC Creature : public Unit
 
         bool AIM_Initialize();
 
-        void AI_SendMoveToPacket(float x, float y, float z, uint32 time, uint32 MovementFlags, uint8 type);
+        void AI_SendMoveToPacket(float x, float y, float z, uint32 time, MonsterMovementFlags MovementFlags, uint8 type);
         CreatureAI* AI() { return i_AI; }
+
+        void AddMonsterMoveFlag(MonsterMovementFlags f) { m_monsterMoveFlags = MonsterMovementFlags(m_monsterMoveFlags | f); }
+        void RemoveMonsterMoveFlag(MonsterMovementFlags f) { m_monsterMoveFlags = MonsterMovementFlags(m_monsterMoveFlags & ~f); }
+        bool HasMonsterMoveFlag(MonsterMovementFlags f) const { return m_monsterMoveFlags & f; }
+        MonsterMovementFlags GetMonsterMoveFlags() const { return m_monsterMoveFlags; }
+        void SetMonsterMoveFlags(MonsterMovementFlags f) { m_monsterMoveFlags = f; }
+
+        void SendMonsterMoveWithSpeed(float x, float y, float z, uint32 transitTime = 0, Player* player = NULL);
+        void SendMonsterMoveWithSpeedToCurrentDestination(Player* player = NULL);
 
         uint32 GetShieldBlockValue() const                  //dunno mob block value
         {
@@ -603,6 +619,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         float GetAttackDistance(Unit const* pl) const;
 
         void DoFleeToGetAssistance();
+        void CallForHelp(float fRadius);
         void CallAssistance();
         void SetNoCallAssistance(bool val) { m_AlreadyCallAssistance = val; }
         void SetNoSearchAssistance(bool val) { m_AlreadySearchedAssistance = val; }
@@ -621,6 +638,8 @@ class MANGOS_DLL_SPEC Creature : public Unit
         void RemoveCorpse();
         bool isDeadByDefault() const { return m_isDeadByDefault; };
 
+        void ForcedDespawn();
+
         time_t const& GetRespawnTime() const { return m_respawnTime; }
         time_t GetRespawnTimeEx() const;
         void SetRespawnTime(uint32 respawn) { m_respawnTime = respawn ? time(NULL) + respawn : 0; }
@@ -637,6 +656,8 @@ class MANGOS_DLL_SPEC Creature : public Unit
         uint64 lootingGroupLeaderGUID;                      // used to find group which is looting corpse
 
         void SendZoneUnderAttackMessage(Player* attacker);
+
+        void SetInCombatWithZone();
 
         bool hasQuest(uint32 quest_id) const;
         bool hasInvolvedQuest(uint32 quest_id)  const;
@@ -713,6 +734,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         GridReference<Creature> m_gridRef;
         CreatureInfo const* m_creatureInfo;                 // in heroic mode can different from ObjMgr::GetCreatureTemplate(GetEntry())
         bool m_isActiveObject;
+        MonsterMovementFlags m_monsterMoveFlags;
 };
 
 class AssistDelayEvent : public BasicEvent

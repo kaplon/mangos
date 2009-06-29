@@ -132,8 +132,9 @@ class ChatHandler
         bool HandleDebugGetLootRecipient(const char * args);
         bool HandleDebugGetValue(const char* args);
         bool HandleDebugMod32Value(const char* args);
-        bool HandleDebugSetValue(const char* args);
+        bool HandleDebugSetAuraStateCommand(const char * args);
         bool HandleDebugSetItemFlagCommand(const char * args);
+        bool HandleDebugSetValue(const char* args);
         bool HandleDebugSpawnVehicle(const char * args);
         bool HandleDebugUpdate(const char* args);
         bool HandleDebugUpdateWorldStateCommand(const char* args);
@@ -331,6 +332,7 @@ class ChatHandler
         bool HandleReloadGOQuestRelationsCommand(const char* args);
         bool HandleReloadGOQuestInvRelationsCommand(const char* args);
         bool HandleReloadItemEnchantementsCommand(const char* args);
+        bool HandleReloadItemRequiredTragetCommand(const char* args);
         bool HandleReloadLocalesAchievementRewardCommand(const char* args);
         bool HandleReloadLocalesCreatureCommand(const char* args);
         bool HandleReloadLocalesGameobjectCommand(const char* args);
@@ -519,6 +521,7 @@ class ChatHandler
         bool HandleBanInfoHelper(uint32 accountid, char const* accountname);
         bool HandleUnBanHelper(BanMode mode,char const* args);
         void HandleCharacterLevel(Player* player, uint64 player_guid, uint32 oldlevel, uint32 newlevel);
+        void HandleLearnSkillRecipesHelper(Player* player,uint32 skill_id);
 
         void SetSentErrorMessage(bool val){ sentErrorMessage = val;};
     private:

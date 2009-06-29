@@ -67,15 +67,15 @@ enum SpellFamilyNames
 };
 
 //Some SpellFamilyFlags
-#define SPELLFAMILYFLAG_ROGUE_VANISH            0x000000800LL
-#define SPELLFAMILYFLAG_ROGUE_STEALTH           0x000400000LL
-#define SPELLFAMILYFLAG_ROGUE_BACKSTAB          0x000800004LL
-#define SPELLFAMILYFLAG_ROGUE_SAP               0x000000080LL
-#define SPELLFAMILYFLAG_ROGUE_FEINT             0x008000000LL
-#define SPELLFAMILYFLAG_ROGUE_KIDNEYSHOT        0x000200000LL
-#define SPELLFAMILYFLAG_ROGUE__FINISHING_MOVE   0x9003E0000LL
+#define SPELLFAMILYFLAG_ROGUE_VANISH            UI64LIT(0x000000800)
+#define SPELLFAMILYFLAG_ROGUE_STEALTH           UI64LIT(0x000400000)
+#define SPELLFAMILYFLAG_ROGUE_BACKSTAB          UI64LIT(0x000800004)
+#define SPELLFAMILYFLAG_ROGUE_SAP               UI64LIT(0x000000080)
+#define SPELLFAMILYFLAG_ROGUE_FEINT             UI64LIT(0x008000000)
+#define SPELLFAMILYFLAG_ROGUE_KIDNEYSHOT        UI64LIT(0x000200000)
+#define SPELLFAMILYFLAG_ROGUE__FINISHING_MOVE   UI64LIT(0x9003E0000)
 
-#define SPELLFAMILYFLAG_PALADIN_SEALS           0x26000C000A000000LL
+#define SPELLFAMILYFLAG_PALADIN_SEALS           UI64LIT(0x26000C000A000000)
 // Spell clasification
 enum SpellSpecific
 {
@@ -104,8 +104,18 @@ SpellSpecific GetSpellSpecific(uint32 spellId);
 // Different spell properties
 inline float GetSpellRadius(SpellRadiusEntry const *radius) { return (radius ? radius->Radius : 0); }
 uint32 GetSpellCastTime(SpellEntry const* spellInfo, Spell const* spell = NULL);
-inline float GetSpellMinRange(SpellRangeEntry const *range) { return (range ? range->minRange : 0); }
-inline float GetSpellMaxRange(SpellRangeEntry const *range) { return (range ? range->maxRange : 0); }
+inline float GetSpellMinRange(SpellRangeEntry const *range, bool friendly = false)
+{
+    if(!range)
+        return 0;
+    return (friendly ? range->minRangeFriendly : range->minRange);
+}
+inline float GetSpellMaxRange(SpellRangeEntry const *range, bool friendly = false)
+{
+    if(!range)
+        return 0;
+    return (friendly ? range->maxRangeFriendly : range->maxRange);
+}
 inline uint32 GetSpellRecoveryTime(SpellEntry const *spellInfo) { return spellInfo->RecoveryTime > spellInfo->CategoryRecoveryTime ? spellInfo->RecoveryTime : spellInfo->CategoryRecoveryTime; }
 int32 GetSpellDuration(SpellEntry const *spellInfo);
 int32 GetSpellMaxDuration(SpellEntry const *spellInfo);
@@ -130,20 +140,19 @@ inline bool IsSealSpell(SpellEntry const *spellInfo)
 inline bool IsElementalShield(SpellEntry const *spellInfo)
 {
     // family flags 10 (Lightning), 42 (Earth), 37 (Water), proc shield from T2 8 pieces bonus
-    return (spellInfo->SpellFamilyFlags & 0x42000000400LL) || spellInfo->Id == 23552;
+    return (spellInfo->SpellFamilyFlags & UI64LIT(0x42000000400)) || spellInfo->Id == 23552;
 }
 
 inline bool IsExplicitDiscoverySpell(SpellEntry const *spellInfo)
 {
-    return spellInfo->Effect[0]==SPELL_EFFECT_CREATE_ITEM_2 && spellInfo->Effect[1]==SPELL_EFFECT_SCRIPT_EFFECT;
+    return spellInfo->Effect[0]==SPELL_EFFECT_CREATE_RANDOM_ITEM && spellInfo->Effect[1]==SPELL_EFFECT_SCRIPT_EFFECT;
 }
 
 inline bool IsLootCraftingSpell(SpellEntry const *spellInfo)
 {
-    return spellInfo->Effect[0]==SPELL_EFFECT_CREATE_ITEM_2 && (
-        spellInfo->Effect[1]==SPELL_EFFECT_SCRIPT_EFFECT || // see IsExplicitDiscoverySpell
-        !spellInfo->EffectItemType[0] ||                    // result item not provided
-        spellInfo->TotemCategory[0] == 121);                // different random cards from Inscription (121==Virtuoso Inking Set category)
+    return spellInfo->Effect[0]==SPELL_EFFECT_CREATE_RANDOM_ITEM ||
+        // different random cards from Inscription (121==Virtuoso Inking Set category)
+        spellInfo->Effect[0]==SPELL_EFFECT_CREATE_ITEM_2 && spellInfo->TotemCategory[0] == 121;
 }
 
 int32 CompareAuraRanks(uint32 spellId_1, uint32 effIndex_1, uint32 spellId_2, uint32 effIndex_2);
@@ -178,6 +187,24 @@ bool IsSingleTargetSpell(SpellEntry const *spellInfo);
 bool IsSingleTargetSpells(SpellEntry const *spellInfo1, SpellEntry const *spellInfo2);
 
 bool IsAuraAddedBySpell(uint32 auraType, uint32 spellId);
+
+inline bool IsPointEffectTarget( Targets target )
+{
+    switch (target )
+    {
+        case TARGET_INNKEEPER_COORDINATES:
+        case TARGET_TABLE_X_Y_Z_COORDINATES:
+        case TARGET_CASTER_COORDINATES:
+        case TARGET_SCRIPT_COORDINATES:
+        case TARGET_CURRENT_ENEMY_COORDINATES:
+        case TARGET_DUELVSPLAYER_COORDINATES:
+        case TARGET_DYNAMIC_OBJECT_COORDINATES:
+            return true;
+        default:
+            break;
+    }
+    return false;
+}
 
 inline bool IsAreaEffectTarget( Targets target )
 {
@@ -306,6 +333,7 @@ inline uint32 GetDispellMask(DispelType dispel)
 DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellEntry const* spellproto, bool triggered);
 bool IsDiminishingReturnsGroupDurationLimited(DiminishingGroup group);
 DiminishingReturnsType GetDiminishingReturnsGroupType(DiminishingGroup group);
+int32 GetDiminishingReturnsLimitDuration(DiminishingGroup group, SpellEntry const* spellproto);
 
 // Spell affects related declarations (accessed using SpellMgr functions)
 struct SpellAffectEntry
@@ -500,7 +528,7 @@ class PetAura
         bool removeOnChangePet;
         int32 damage;
 };
-typedef std::map<uint16, PetAura> SpellPetAuraMap;
+typedef std::map<uint32, PetAura> SpellPetAuraMap;
 
 struct SpellArea
 {
@@ -805,9 +833,9 @@ class SpellMgr
             return mSkillLineAbilityMap.upper_bound(spell_id);
         }
 
-        PetAura const* GetPetAura(uint16 spell_id)
+        PetAura const* GetPetAura(uint16 spell_id, uint8 eff)
         {
-            SpellPetAuraMap::const_iterator itr = mSpellPetAuraMap.find(spell_id);
+            SpellPetAuraMap::const_iterator itr = mSpellPetAuraMap.find((spell_id<<8) + eff);
             if(itr != mSpellPetAuraMap.end())
                 return &itr->second;
             else

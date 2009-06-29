@@ -89,6 +89,8 @@ enum Classes
     (1<<(CLASS_MAGE-1))   |(1<<(CLASS_WARLOCK-1))|(1<<(CLASS_DRUID-1)) | \
     (1<<(CLASS_DEATH_KNIGHT-1)) )
 
+#define CLASSMASK_ALL_CREATURES ((1<<(CLASS_WARRIOR-1)) | (1<<(CLASS_PALADIN-1)) | (1<<(CLASS_ROGUE-1)) | (1<<(CLASS_MAGE-1)) )
+
 #define CLASSMASK_WAND_USERS ((1<<(CLASS_PRIEST-1))|(1<<(CLASS_MAGE-1))|(1<<(CLASS_WARLOCK-1)))
 
 #define PLAYER_MAX_BATTLEGROUND_QUEUES 3
@@ -577,7 +579,7 @@ enum SpellEffects
     SPELL_EFFECT_SUMMON_PET                = 56,
     SPELL_EFFECT_LEARN_PET_SPELL           = 57,
     SPELL_EFFECT_WEAPON_DAMAGE             = 58,
-    SPELL_EFFECT_OPEN_LOCK_ITEM            = 59,
+    SPELL_EFFECT_CREATE_RANDOM_ITEM        = 59,
     SPELL_EFFECT_PROFICIENCY               = 60,
     SPELL_EFFECT_SEND_EVENT                = 61,
     SPELL_EFFECT_POWER_BURN                = 62,
@@ -678,7 +680,10 @@ enum SpellEffects
     SPELL_EFFECT_CREATE_ITEM_2             = 157,
     SPELL_EFFECT_MILLING                   = 158,
     SPELL_EFFECT_ALLOW_RENAME_PET          = 159,
-    TOTAL_SPELL_EFFECTS                    = 160
+    SPELL_EFFECT_160                       = 160,
+    SPELL_EFFECT_TALENT_SPEC_COUNT         = 161,
+    SPELL_EFFECT_TALENT_SPEC_SELECT        = 162,
+    TOTAL_SPELL_EFFECTS                    = 163
 };
 
 enum SpellCastResult
@@ -1098,7 +1103,7 @@ enum GameobjectTypes
     GAMEOBJECT_TYPE_FISHINGNODE            = 17,
     GAMEOBJECT_TYPE_SUMMONING_RITUAL       = 18,
     GAMEOBJECT_TYPE_MAILBOX                = 19,
-    GAMEOBJECT_TYPE_AUCTIONHOUSE           = 20,
+    GAMEOBJECT_TYPE_DO_NOT_USE             = 20,
     GAMEOBJECT_TYPE_GUARDPOST              = 21,
     GAMEOBJECT_TYPE_SPELLCASTER            = 22,
     GAMEOBJECT_TYPE_MEETINGSTONE           = 23,
@@ -1106,7 +1111,7 @@ enum GameobjectTypes
     GAMEOBJECT_TYPE_FISHINGHOLE            = 25,
     GAMEOBJECT_TYPE_FLAGDROP               = 26,
     GAMEOBJECT_TYPE_MINI_GAME              = 27,
-    GAMEOBJECT_TYPE_LOTTERY_KIOSK          = 28,
+    GAMEOBJECT_TYPE_DO_NOT_USE_2           = 28,
     GAMEOBJECT_TYPE_CAPTURE_POINT          = 29,
     GAMEOBJECT_TYPE_AURA_GENERATOR         = 30,
     GAMEOBJECT_TYPE_DUNGEON_DIFFICULTY     = 31,
@@ -1816,10 +1821,11 @@ enum CreatureFamily
 
 enum CreatureTypeFlags
 {
-    CREATURE_TYPEFLAGS_TAMEABLE        = 0x0001,
-    CREATURE_TYPEFLAGS_HERBLOOT        = 0x0100,
-    CREATURE_TYPEFLAGS_MININGLOOT      = 0x0200,
-    CREATURE_TYPEFLAGS_ENGINEERLOOT    = 0x8000
+    CREATURE_TYPEFLAGS_TAMEABLE        = 0x00001,
+    CREATURE_TYPEFLAGS_HERBLOOT        = 0x00100,
+    CREATURE_TYPEFLAGS_MININGLOOT      = 0x00200,
+    CREATURE_TYPEFLAGS_ENGINEERLOOT    = 0x08000,
+    CREATURE_TYPEFLAGS_EXOTIC          = 0x10000
 };
 
 enum CreatureEliteType
@@ -2315,24 +2321,20 @@ enum DiminishingGroup
     DIMINISHING_NONE,
     DIMINISHING_CONTROL_STUN,                               // Player Controlled stuns
     DIMINISHING_TRIGGER_STUN,                               // By aura proced stuns, usualy chance on hit talents
-    DIMINISHING_SLEEP,
     DIMINISHING_CONTROL_ROOT,                               // Immobilizing effects from casted spells
     DIMINISHING_TRIGGER_ROOT,                               // Immobilizing effects from triggered spells like Frostbite
-    DIMINISHING_FEAR,                                       // Non-warlock fears
+    DIMINISHING_FEAR_BLIND,                                 // Fears & blind
     DIMINISHING_CHARM,
-    // Mage Specific
-    DIMINISHING_POLYMORPH,
-    // Rogue Specific
-    DIMINISHING_KIDNEYSHOT,                                 // Kidney Shot is not diminished with Cheap Shot
+    DIMINISHING_POLYMORPH_GOUGE_SAP,
     // Warlock Specific
     DIMINISHING_DEATHCOIL,                                  // Death Coil Diminish only with another Death Coil
-    DIMINISHING_WARLOCK_FEAR,                               // Also with Sedduction
+    // Druid Specific
+    DIMINISHING_CYCLONE,                                    // From 2.3.0
     // Shared Class Specific
-    DIMINISHING_BLIND_CYCLONE,                              // From 2.3.0
+    DIMINISHING_CHEAPSHOT_POUNCE,
     DIMINISHING_DISARM,                                     // From 2.3.0
     DIMINISHING_SILENCE,                                    // From 2.3.0
-    DIMINISHING_FREEZE,                                     // Hunter's Freezing Trap
-    DIMINISHING_KNOCKOUT,                                   // Also with Sap, all Knockout mechanics are here
+    DIMINISHING_FREEZE_SLEEP,                               // Hunter's Freezing Trap
     DIMINISHING_BANISH,
     // Other
     // Don't Diminish, but limit duration to 10s
@@ -2367,8 +2369,9 @@ enum SummonType
     SUMMON_TYPE_UNKNOWN5    = 409,
     SUMMON_TYPE_UNKNOWN2    = 427,
     SUMMON_TYPE_POSESSED2   = 428,
-    SUMMON_TYPE_FORCE_OF_NATURE = 669,
-    SUMMON_TYPE_GUARDIAN2   = 1161
+    SUMMON_TYPE_GUARDIAN2   = 1161,
+    SUMMON_TYPE_ELEMENTAL   = 1561,
+    SUMMON_TYPE_FORCE_OF_NATURE = 1562
 };
 
 enum ResponseCodes
@@ -2511,5 +2514,33 @@ enum BattleGroundTypeId
     BATTLEGROUND_RV            = 11
 };
 #define MAX_BATTLEGROUND_TYPE_ID 12
+
+enum MailResponseType
+{
+    MAIL_SEND               = 0,
+    MAIL_MONEY_TAKEN        = 1,
+    MAIL_ITEM_TAKEN         = 2,
+    MAIL_RETURNED_TO_SENDER = 3,
+    MAIL_DELETED            = 4,
+    MAIL_MADE_PERMANENT     = 5
+};
+
+enum MailResponseResult
+{
+    MAIL_OK                            = 0,
+    MAIL_ERR_EQUIP_ERROR               = 1,
+    MAIL_ERR_CANNOT_SEND_TO_SELF       = 2,
+    MAIL_ERR_NOT_ENOUGH_MONEY          = 3,
+    MAIL_ERR_RECIPIENT_NOT_FOUND       = 4,
+    MAIL_ERR_NOT_YOUR_TEAM             = 5,
+    MAIL_ERR_INTERNAL_ERROR            = 6,
+    MAIL_ERR_DISABLED_FOR_TRIAL_ACC    = 14,
+    MAIL_ERR_RECIPIENT_CAP_REACHED     = 15,
+    MAIL_ERR_CANT_SEND_WRAPPED_COD     = 16,
+    MAIL_ERR_MAIL_AND_CHAT_SUSPENDED   = 17,
+    MAIL_ERR_TOO_MANY_ATTACHMENTS      = 18,
+    MAIL_ERR_MAIL_ATTACHMENT_INVALID   = 19,
+    MAIL_ERR_ITEM_HAS_EXPIRED          = 21,
+};
 
 #endif
