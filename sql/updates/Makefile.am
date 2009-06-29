@@ -25,6 +25,7 @@ pkgdatadir = $(datadir)/mangos/sql/updates
 ## Files to be installed
 #  Install basic SQL files to datadir
 pkgdata_DATA = \
+        custom/patch_lightwell_pasdVn.sql \
 	2008_12_22_01_mangos_creature_equip_template.sql \
 	2008_12_22_02_characters_character_pet.sql \
 	2008_12_22_03_mangos_item_template.sql \
@@ -205,6 +206,7 @@ pkgdata_DATA = \
 ## Additional files to include when running 'make dist'
 #  SQL update files, to upgrade database schema from older revisions
 EXTRA_DIST = \
+	custom/patch_lightwell_pasdVn.sql \
 	2008_12_22_01_mangos_creature_equip_template.sql \
 	2008_12_22_02_characters_character_pet.sql \
 	2008_12_22_03_mangos_item_template.sql \
