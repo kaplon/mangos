@@ -2791,17 +2791,7 @@ void Spell::EffectEnergize(uint32 i)
         default:
             break;
     }
-    
-    // Judgement of Wisdom custom case
-        if(m_spellInfo->Id == 20268)
-        {
-            if(unitTarget->GetTypeId() == TYPEID_PLAYER)
-            {
-            uint32 basemana = ((Player*)unitTarget)->GetCreateMana();
-            damage *= basemana / 100;
-            }
-        }
-    
+
     if (level_diff > 0)
         damage -= multiplier * level_diff;
 
