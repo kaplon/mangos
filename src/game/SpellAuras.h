@@ -292,12 +292,15 @@ class MANGOS_DLL_SPEC Aura
         bool IsDeathPersistent() const { return m_isDeathPersist; }
         bool IsRemovedOnShapeLost() const { return m_isRemovedOnShapeLost; }
         bool IsInUse() const { return m_in_use;}
+        bool IsStacking() const { return m_stacking;}
 
         virtual void Update(uint32 diff);
         void ApplyModifier(bool apply, bool Real = false);
 
         void _AddAura();
         void _RemoveAura();
+
+        bool IsEffectStacking();
 
         bool IsUpdated() { return m_updated; }
         void SetUpdated(bool val) { m_updated = val; }
@@ -362,6 +365,7 @@ class MANGOS_DLL_SPEC Aura
         bool m_updated:1;                                   // Prevent remove aura by stack if set
         bool m_in_use:1;                                    // true while in Aura::ApplyModifier call
         bool m_isSingleTargetAura:1;                        // true if it's a single target spell and registered at caster - can change at spell steal for example
+        bool m_stacking:1;                                  // Aura is not overwritten, but effects are not cumulative with similar effects
 
     private:
         void CleanupTriggeredSpells();

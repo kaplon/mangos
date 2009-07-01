@@ -280,7 +280,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandlePeriodicTriggerSpellWithValue,             //227 SPELL_AURA_PERIODIC_TRIGGER_SPELL_WITH_VALUE
     &Aura::HandleNoImmediateEffect,                         //228 stealth detection
     &Aura::HandleNULL,                                      //229 SPELL_AURA_MOD_AOE_DAMAGE_AVOIDANCE
-    &Aura::HandleAuraModIncreaseMaxHealth,                  //230 Commanding Shout
+    &Aura::HandleAuraModIncreaseMaxHealth,                  //230 SPELL_AURA_MOD_PARTY_MAX_HEALTH
     &Aura::HandleNoImmediateEffect,                         //231 SPELL_AURA_PROC_TRIGGER_SPELL_WITH_VALUE
     &Aura::HandleNoImmediateEffect,                         //232 SPELL_AURA_MECHANIC_DURATION_MOD           implement in Unit::CalculateSpellDuration
     &Aura::HandleNULL,                                      //233 set model id to the one of the creature with id m_modifier.m_miscvalue
@@ -448,6 +448,8 @@ m_isRemovedOnShapeLost(true), m_updated(false), m_in_use(false)
                               m_spellProto->Stances &&
                             !(m_spellProto->AttributesEx2 & SPELL_ATTR_EX2_NOT_NEED_SHAPESHIFT) &&
                             !(m_spellProto->Attributes & SPELL_ATTR_NOT_SHAPESHIFT));
+
+    m_stacking = IsEffectStacking();
 }
 
 Aura::~Aura()
@@ -1236,6 +1238,53 @@ bool Aura::isAffectedOnSpell(SpellEntry const *spell) const
     if (ptr[2] & spell->SpellFamilyFlags2)
         return true;
     return false;
+}
+
+bool Aura::IsEffectStacking()
+{
+    switch(GetModifier()->m_auraname)
+    {
+        case SPELL_AURA_MOD_STAT:
+            // Strength of Earth Totem / Horn of Winter / Fel Intellect / Arcane Intellect / Divine Spirit
+            if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_SHAMAN ||
+                GetSpellProto()->SpellFamilyName == SPELLFAMILY_DEATHKNIGHT ||
+                (GetSpellProto()->SpellFamilyName == SPELLFAMILY_WARLOCK && GetSpellProto()->SpellIconID == 1940) ||
+                (GetSpellProto()->SpellFamilyName == SPELLFAMILY_MAGE && GetSpellProto()->SpellFamilyFlags ==  UI64LIT(0x400)) ||
+                (GetSpellProto()->SpellFamilyName == SPELLFAMILY_PRIEST && GetSpellProto()->SpellFamilyFlags == UI64LIT(0x20)))
+                return false;    break;
+        case SPELL_AURA_MOD_POWER_REGEN:
+            // (Greater) Blessing of Wisdom / Mana Spring Totem
+            if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_PALADIN ||
+                GetSpellProto()->SpellFamilyName == SPELLFAMILY_SHAMAN)
+                return false;    break;
+        case SPELL_AURA_MOD_ATTACK_POWER:
+        case SPELL_AURA_MOD_RANGED_ATTACK_POWER:
+            // (Greater) Blessing of Might / Battle Shout
+            if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_PALADIN ||
+                (GetSpellProto()->SpellFamilyName == SPELLFAMILY_WARRIOR && GetSpellProto()->SpellIconID == 456))
+                return false;    break;
+        case SPELL_AURA_MOD_RESISTANCE_PCT:
+            // Ancestral Healing / Inspiration
+            if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_SHAMAN ||
+                GetSpellProto()->SpellFamilyName == SPELLFAMILY_PRIEST)
+                return false;    break;
+        case SPELL_AURA_MOD_RESISTANCE_EXCLUSIVE:
+            return false;        break;
+        case SPELL_AURA_MOD_ATTACK_POWER_PCT:
+        case SPELL_AURA_MOD_RANGED_ATTACK_POWER_PCT:
+            // Abomination's Might / Trueshot Aura / Unleashed Rage
+            if ((GetSpellProto()->SpellFamilyName == SPELLFAMILY_DEATHKNIGHT && GetSpellProto()->SpellIconID == 2729) ||
+                (GetSpellProto()->SpellFamilyName == SPELLFAMILY_HUNTER && GetSpellProto()->SpellIconID == 128) ||
+                 GetSpellProto()->SpellIconID == 2021)
+                return false;    break;
+        case SPELL_AURA_MOD_PARTY_MAX_HEALTH:
+            // Commanding Shout / Blood Pact
+            return false;        break;
+
+        default:
+            return true;
+    }
+    return true;
 }
 
 /*********************************************************/
@@ -4472,9 +4521,9 @@ void Aura::HandleAuraModResistanceExclusive(bool apply, bool /*Real*/)
     {
         if(m_modifier.m_miscvalue & int32(1<<x))
         {
-            m_target->HandleStatModifier(UnitMods(UNIT_MOD_RESISTANCE_START + x), BASE_VALUE, float(m_modifier.m_amount), apply);
-            if(m_target->GetTypeId() == TYPEID_PLAYER)
-                m_target->ApplyResistanceBuffModsMod(SpellSchools(x), m_positive, m_modifier.m_amount, apply);
+            float change = m_target->CheckAuraStackingAndApply(this, UnitMods(UNIT_MOD_RESISTANCE_START + x), TOTAL_VALUE, float(m_modifier.m_amount), apply, int32(1<<x));
+            if(m_target->GetTypeId() == TYPEID_PLAYER && change != 0)
+                m_target->ApplyResistanceBuffModsMod(SpellSchools(x), m_positive, change, true);
         }
     }
 }
@@ -4517,11 +4566,11 @@ void Aura::HandleModResistancePercent(bool apply, bool /*Real*/)
     {
         if(m_modifier.m_miscvalue & int32(1<<i))
         {
-            m_target->HandleStatModifier(UnitMods(UNIT_MOD_RESISTANCE_START + i), TOTAL_PCT, float(m_modifier.m_amount), apply);
+            float change = m_target->CheckAuraStackingAndApply(this, UnitMods(UNIT_MOD_RESISTANCE_START + i), TOTAL_PCT, float(m_modifier.m_amount), apply, int32(1<<i));
             if(m_target->GetTypeId() == TYPEID_PLAYER || ((Creature*)m_target)->isPet())
             {
-                m_target->ApplyResistanceBuffModsPercentMod(SpellSchools(i), true, m_modifier.m_amount, apply);
-                m_target->ApplyResistanceBuffModsPercentMod(SpellSchools(i), false, m_modifier.m_amount, apply);
+                m_target->ApplyResistanceBuffModsPercentMod(SpellSchools(i), true, change, apply);
+                m_target->ApplyResistanceBuffModsPercentMod(SpellSchools(i), false, change, apply);
             }
         }
     }
@@ -4562,9 +4611,9 @@ void Aura::HandleAuraModStat(bool apply, bool /*Real*/)
         if (m_modifier.m_miscvalue < 0 || m_modifier.m_miscvalue == i)
         {
             //m_target->ApplyStatMod(Stats(i), m_modifier.m_amount,apply);
-            m_target->HandleStatModifier(UnitMods(UNIT_MOD_STAT_START + i), TOTAL_VALUE, float(m_modifier.m_amount), apply);
-            if(m_target->GetTypeId() == TYPEID_PLAYER || ((Creature*)m_target)->isPet())
-                m_target->ApplyStatBuffMod(Stats(i), m_modifier.m_amount, apply);
+            float change = m_target->CheckAuraStackingAndApply(this, UnitMods(UNIT_MOD_STAT_START + i), TOTAL_VALUE, float(m_modifier.m_amount), apply, 0, i+1);
+            if((m_target->GetTypeId() == TYPEID_PLAYER || ((Creature*)m_target)->isPet()) && change != 0)
+                m_target->ApplyStatBuffMod(Stats(i), (change < 0 && !IsStacking() ? -change : change), apply);
         }
     }
 }
@@ -4740,13 +4789,13 @@ void Aura::HandleModPowerRegen(bool apply, bool Real)       // drinking
 
     m_periodicTimer = 5000;
 
-    if (m_target->GetTypeId() == TYPEID_PLAYER && m_modifier.m_miscvalue == POWER_MANA)
-        ((Player*)m_target)->UpdateManaRegen();
+    if (m_modifier.m_miscvalue == POWER_MANA)
+        m_target->CheckAuraStackingAndApply(this, UNIT_MOD_MANA_REGEN, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 
     m_isPeriodic = apply;
 }
 
-void Aura::HandleModPowerRegenPCT(bool /*apply*/, bool Real)
+void Aura::HandleModPowerRegenPCT(bool apply, bool Real)
 {
     // spells required only Real aura add/remove
     if(!Real)
@@ -4757,10 +4806,10 @@ void Aura::HandleModPowerRegenPCT(bool /*apply*/, bool Real)
 
     // Update manaregen value
     if (m_modifier.m_miscvalue == POWER_MANA)
-        ((Player*)m_target)->UpdateManaRegen();
+        m_target->CheckAuraStackingAndApply(this, UNIT_MOD_MANA_REGEN, TOTAL_PCT, float(m_modifier.m_amount), apply);
 }
 
-void Aura::HandleModManaRegen(bool /*apply*/, bool Real)
+void Aura::HandleModManaRegen(bool apply, bool Real)
 {
     // spells required only Real aura add/remove
     if(!Real)
@@ -4770,7 +4819,7 @@ void Aura::HandleModManaRegen(bool /*apply*/, bool Real)
         return;
 
     //Note: an increase in regen does NOT cause threat.
-    ((Player*)m_target)->UpdateManaRegen();
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_MANA_REGEN, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
 void Aura::HandleComprehendLanguage(bool apply, bool /*Real*/)
@@ -4821,7 +4870,7 @@ void  Aura::HandleAuraModIncreaseMaxHealth(bool apply, bool /*Real*/)
     uint32 oldhealth = m_target->GetHealth();
     double healthPercentage = (double)oldhealth / (double)m_target->GetMaxHealth();
 
-    m_target->HandleStatModifier(UNIT_MOD_HEALTH, TOTAL_VALUE, float(m_modifier.m_amount), apply);
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_HEALTH, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 
     // refresh percentage
     if(oldhealth > 0)
@@ -5063,7 +5112,7 @@ void Aura::HandleRangedAmmoHaste(bool apply, bool /*Real*/)
 
 void Aura::HandleAuraModAttackPower(bool apply, bool /*Real*/)
 {
-    m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER, TOTAL_VALUE, float(m_modifier.m_amount), apply);
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_ATTACK_POWER, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
 void Aura::HandleAuraModRangedAttackPower(bool apply, bool /*Real*/)
@@ -5071,13 +5120,13 @@ void Aura::HandleAuraModRangedAttackPower(bool apply, bool /*Real*/)
     if((m_target->getClassMask() & CLASSMASK_WAND_USERS)!=0)
         return;
 
-    m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_VALUE, float(m_modifier.m_amount), apply);
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_VALUE, float(m_modifier.m_amount), apply);
 }
 
 void Aura::HandleAuraModAttackPowerPercent(bool apply, bool /*Real*/)
 {
     //UNIT_FIELD_ATTACK_POWER_MULTIPLIER = multiplier - 1
-    m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER, TOTAL_PCT, float(m_modifier.m_amount), apply);
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_ATTACK_POWER, TOTAL_PCT, float(m_modifier.m_amount), apply);
 }
 
 void Aura::HandleAuraModRangedAttackPowerPercent(bool apply, bool /*Real*/)
@@ -5086,7 +5135,7 @@ void Aura::HandleAuraModRangedAttackPowerPercent(bool apply, bool /*Real*/)
         return;
 
     //UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER = multiplier - 1
-    m_target->HandleStatModifier(UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_PCT, float(m_modifier.m_amount), apply);
+    m_target->CheckAuraStackingAndApply(this, UNIT_MOD_ATTACK_POWER_RANGED, TOTAL_PCT, float(m_modifier.m_amount), apply);
 }
 
 void Aura::HandleAuraModRangedAttackPowerOfStatPercent(bool /*apply*/, bool Real)
