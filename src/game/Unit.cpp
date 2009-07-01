@@ -4853,6 +4853,12 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                     }
                     return true;
                 }
+                case 56374:
+                {
+                    target = this;
+                    target->RemoveSpellsCausingAura(SPELL_AURA_HASTE_SPELLS);
+                    target->RemoveSpellsCausingAura(SPELL_AURA_MOD_DECREASE_SPEED);
+                }
             }
             break;
         }
