@@ -120,8 +120,6 @@ Unit::Unit()
         m_auraModifiersGroup[i][BASE_PCT] = 1.0f;
         m_auraModifiersGroup[i][TOTAL_VALUE] = 0.0f;
         m_auraModifiersGroup[i][TOTAL_PCT] = 1.0f;
-        m_auraModifiersGroup[i][NONSTACKING_VALUE] = 0.0f;
-        m_auraModifiersGroup[i][NONSTACKING_PCT] = 1.0f;
     }
                                                             // implement 50% base damage from offhand
     m_auraModifiersGroup[UNIT_MOD_DAMAGE_OFFHAND][TOTAL_PCT] = 0.5f;
@@ -3476,7 +3474,7 @@ bool Unit::AddAura(Aura *Aur)
         }
     }
 
-    // passive auras not stackable with other ranks
+    // passive auras not stacable with other ranks
     if (!IsPassiveSpellStackableWithRanks(aurSpellInfo))
     {
         if (!RemoveNoStackAurasDueToAura(Aur))
@@ -3534,41 +3532,6 @@ bool Unit::AddAura(Aura *Aur)
     Aur->ApplyModifier(true,true);
     sLog.outDebug("Aura %u now is in use", aurName);
     return true;
-}
-
-float Unit::CheckAuraStackingAndApply(Aura *Aur, UnitMods unitMod, UnitModifierType modifierType, float amount, bool apply, int32 miscMask, int32 miscValue)
-{
-    if(!Aur->IsStacking()){
-        if(modifierType == TOTAL_VALUE)
-            modifierType = NONSTACKING_VALUE;
-        else if(modifierType == TOTAL_PCT)
-            modifierType = NONSTACKING_PCT;
-        // need a sanity check here?
-
-        float current = GetModifierValue(unitMod, modifierType);
-        float temp = amount;
-
-        if(amount < current)                                // value does not change as a result of applying/removing this aura
-            return 0.0f;
-
-        if(!apply)                                          // aura removed is the aura that is currently in effect, must find second best nonstacking aura's m_amount
-        {
-            if(miscMask)
-                temp = (float)GetMaxPositiveAuraModifierByMiscMask(Aur->GetModifier()->m_auraname, miscMask);
-            else if(miscValue)
-                temp = (float)GetMaxPositiveAuraModifierByMiscValue(Aur->GetModifier()->m_auraname, miscValue-1);
-            else
-                temp = (float)GetMaxPositiveAuraModifier(Aur->GetModifier()->m_auraname);
-        }
-
-        HandleStatModifier(unitMod, modifierType, temp, apply);
-
-        amount = temp - current;
-    }
-    else
-        HandleStatModifier(unitMod, modifierType, amount, apply);
-
-    return amount;
 }
 
 void Unit::RemoveRankAurasDueToSpell(uint32 spellId)
@@ -10041,11 +10004,6 @@ bool Unit::HandleStatModifier(UnitMods unitMod, UnitModifierType modifierType, f
             val = (100.0f + amount) / 100.0f;
             m_auraModifiersGroup[unitMod][modifierType] *= apply ? val : (1.0f/val);
             break;
-        case NONSTACKING_PCT:
-            amount = (amount + 100.0f) / 100.0f;
-        case NONSTACKING_VALUE:
-            m_auraModifiersGroup[unitMod][modifierType] = amount;
-            break;
 
         default:
             break;
@@ -10071,11 +10029,7 @@ bool Unit::HandleStatModifier(UnitMods unitMod, UnitModifierType modifierType, f
         case UNIT_MOD_ENERGY:
         case UNIT_MOD_HAPPINESS:
         case UNIT_MOD_RUNE:
-        case UNIT_MOD_RUNIC_POWER:         UpdateMaxPower(GetPowerTypeByAuraGroup(unitMod));           break;
-
-        case UNIT_MOD_MANA_REGEN:
-        case UNIT_MOD_MANA_REGEN_PCT:      if(GetTypeId() == TYPEID_PLAYER)
-                                                ((Player*)this)->UpdateManaRegen();                    break;
+        case UNIT_MOD_RUNIC_POWER:          UpdateMaxPower(GetPowerTypeByAuraGroup(unitMod));          break;
 
         case UNIT_MOD_RESISTANCE_HOLY:
         case UNIT_MOD_RESISTANCE_FIRE:
@@ -10106,21 +10060,10 @@ float Unit::GetModifierValue(UnitMods unitMod, UnitModifierType modifierType) co
         return 0.0f;
     }
 
-    if(modifierType == TOTAL_PCT)
-    {
-        if(m_auraModifiersGroup[unitMod][modifierType] <= 0.0f)
-        {
-            return 0.0f;
-        }
-        else{
-            return m_auraModifiersGroup[unitMod][TOTAL_PCT] * m_auraModifiersGroup[unitMod][NONSTACKING_PCT];
-        }
-    }
-    else if(modifierType == TOTAL_VALUE){
-        return m_auraModifiersGroup[unitMod][TOTAL_VALUE] + m_auraModifiersGroup[unitMod][NONSTACKING_VALUE];
-    }
-    else
-        return m_auraModifiersGroup[unitMod][modifierType];
+    if(modifierType == TOTAL_PCT && m_auraModifiersGroup[unitMod][modifierType] <= 0.0f)
+        return 0.0f;
+
+    return m_auraModifiersGroup[unitMod][modifierType];
 }
 
 float Unit::GetTotalStatValue(Stats stat) const
@@ -10133,8 +10076,8 @@ float Unit::GetTotalStatValue(Stats stat) const
     // value = ((base_value * base_pct) + total_value) * total_pct
     float value  = m_auraModifiersGroup[unitMod][BASE_VALUE] + GetCreateStat(stat);
     value *= m_auraModifiersGroup[unitMod][BASE_PCT];
-    value += (m_auraModifiersGroup[unitMod][TOTAL_VALUE] + m_auraModifiersGroup[unitMod][NONSTACKING_VALUE]);
-    value *= (m_auraModifiersGroup[unitMod][TOTAL_PCT] * m_auraModifiersGroup[unitMod][NONSTACKING_PCT]);
+    value += m_auraModifiersGroup[unitMod][TOTAL_VALUE];
+    value *= m_auraModifiersGroup[unitMod][TOTAL_PCT];
 
     return value;
 }
@@ -10152,8 +10095,8 @@ float Unit::GetTotalAuraModValue(UnitMods unitMod) const
 
     float value  = m_auraModifiersGroup[unitMod][BASE_VALUE];
     value *= m_auraModifiersGroup[unitMod][BASE_PCT];
-    value += (m_auraModifiersGroup[unitMod][TOTAL_VALUE] + m_auraModifiersGroup[unitMod][NONSTACKING_VALUE]);
-    value *= (m_auraModifiersGroup[unitMod][TOTAL_PCT] * m_auraModifiersGroup[unitMod][NONSTACKING_PCT]);
+    value += m_auraModifiersGroup[unitMod][TOTAL_VALUE];
+    value *= m_auraModifiersGroup[unitMod][TOTAL_PCT];
 
     return value;
 }

@@ -300,9 +300,7 @@ enum UnitModifierType
     BASE_PCT = 1,
     TOTAL_VALUE = 2,
     TOTAL_PCT = 3,
-    NONSTACKING_VALUE = 4,
-    NONSTACKING_PCT = 5,
-    MODIFIER_TYPE_END = 6
+    MODIFIER_TYPE_END = 4
 };
 
 enum WeaponDamageRange
@@ -342,8 +340,6 @@ enum UnitMods
     UNIT_MOD_HAPPINESS,
     UNIT_MOD_RUNE,
     UNIT_MOD_RUNIC_POWER,
-    UNIT_MOD_MANA_REGEN,
-    UNIT_MOD_MANA_REGEN_PCT,
     UNIT_MOD_ARMOR,                                         // UNIT_MOD_ARMOR..UNIT_MOD_RESISTANCE_ARCANE must be in existed order, it's accessed by index values of SpellSchools enum.
     UNIT_MOD_RESISTANCE_HOLY,
     UNIT_MOD_RESISTANCE_FIRE,
@@ -1180,8 +1176,6 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         Pet* CreateTamedPetFrom(Creature* creatureTarget,uint32 spell_id = 0);
 
         bool AddAura(Aura *aur);
-
-        float CheckAuraStackingAndApply(Aura *Aur, UnitMods unitMod, UnitModifierType modifierType, float amount, bool apply, int32 miscMask = 0, int32 miscValue = 0);
 
         void RemoveAura(AuraMap::iterator &i, AuraRemoveMode mode = AURA_REMOVE_BY_DEFAULT);
         void RemoveAura(uint32 spellId, uint32 effindex, Aura* except = NULL);
