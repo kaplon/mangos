@@ -2222,6 +2222,20 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             }
 
         }
+
+        // Vampiric touch
+        if (caster && m_spellProto->SpellFamilyName == SPELLFAMILY_PRIEST &&
+            m_spellProto->SpellFamilyFlags & UI64LIT(0x0000040000000000) &&
+            m_removeMode == AURA_REMOVE_BY_DISPEL)
+        {
+            if (Aura *dot = m_target->GetAura(SPELL_AURA_PERIODIC_DAMAGE, m_spellProto->SpellFamilyName, m_spellProto->SpellFamilyFlags, m_spellProto->SpellFamilyFlags2, GetCasterGUID()))
+            {
+                int32 bp0 = dot->GetModifier()->m_amount;
+                bp0 = 4 * caster->SpellDamageBonus(m_target, GetSpellProto(), bp0, DOT, GetStackAmount());
+                m_target->CastCustomSpell(m_target, 64085, &bp0, NULL, NULL, true, NULL, this, GetCasterGUID());
+            }
+            return;
+        }
     }
 
     // AT APPLY & REMOVE
