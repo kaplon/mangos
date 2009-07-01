@@ -4052,6 +4052,14 @@ Aura* Unit::GetAura(AuraType type, uint32 family, uint64 familyFlag, uint32 fami
 
 bool Unit::HasAura(uint32 spellId) const
 {
+    // Divine Shield, Divine Protection, Hand of Protection Hack
+    if( spellId == 61988)
+    {
+        if( HasAura(61987) )
+            return true;
+        spellId = 25771;
+    }
+
     for (int i = 0; i < 3 ; ++i)
     {
         AuraMap::const_iterator iter = m_Auras.find(spellEffectPair(spellId, i));
