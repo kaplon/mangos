@@ -5171,7 +5171,7 @@ void Spell::EffectScriptEffect(uint32 effIndex)
         case SPELLFAMILY_PALADIN:
         {
             // Judgement
-            if (m_spellInfo->SpellFamilyFlags & UI64LIT(0x0000000000800000))
+            if (m_spellInfo->Category == 1210 )
             {
                 if(!unitTarget || !unitTarget->isAlive())
                     return;
