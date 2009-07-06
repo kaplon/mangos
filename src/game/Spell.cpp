@@ -540,6 +540,7 @@ void Spell::FillTargetMap()
                     SetTargetMap(i, m_spellInfo->EffectImplicitTargetB[i], tmpUnitMap);
                 }
                 break;
+            case TARGET_RANDOM_DEST_IN_RADIUS:
             case TARGET_TABLE_X_Y_Z_COORDINATES:
                 switch(m_spellInfo->EffectImplicitTargetB[i])
                 {
@@ -1722,6 +1723,18 @@ void Spell::SetTargetMap(uint32 i,uint32 cur,UnitList& TagUnitMap)
                 caster = m_caster;
             // Set dest for targets
             m_targets.setDestination(caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ());
+        }break;
+        case TARGET_RANDOM_DEST_IN_RADIUS:
+        {
+            Unit* target = m_targets.getUnitTarget() ?  m_targets.getUnitTarget() : m_caster;
+            radius = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellInfo->rangeIndex));
+            if(radius == 0)
+                m_targets.setDestination(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
+            else{
+            float px,py,pz;
+            target->GetRandomPoint(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), radius, px, py, pz);
+            m_targets.setDestination(px, py, pz);
+            }
         }break;
         case TARGET_ALL_FRIENDLY_UNITS_AROUND_CASTER:
             // special target order

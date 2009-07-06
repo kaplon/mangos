@@ -199,6 +199,7 @@ inline bool IsPointEffectTarget( Targets target )
         case TARGET_CURRENT_ENEMY_COORDINATES:
         case TARGET_DUELVSPLAYER_COORDINATES:
         case TARGET_DYNAMIC_OBJECT_COORDINATES:
+        case TARGET_RANDOM_DEST_IN_RADIUS:
             return true;
         default:
             break;
