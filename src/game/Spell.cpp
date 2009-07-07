@@ -2329,9 +2329,6 @@ void Spell::cast(bool skipCheck)
             // Divine Shield, Divine Protection or Hand of Protection
             if (m_spellInfo->SpellFamilyFlags & UI64LIT(0x0000000000400080))
                 m_preCastSpell = 25771;                     // Forbearance
-            // Avenging Wrath or Forbearance
-            else if (m_spellInfo->SpellFamilyFlags & UI64LIT(0x0000200000000000) || m_spellInfo->Id == 25771)
-                m_preCastSpell = 61987;                                // Avenging Wrath Marker
             break;
         }
         case SPELLFAMILY_SHAMAN:
