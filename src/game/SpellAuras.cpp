@@ -4277,6 +4277,26 @@ void Aura::HandlePeriodicEnergize(bool apply, bool Real)
     if (GetId() == 57669 ||
         GetId() == 61782)
         m_modifier.m_amount = m_target->GetMaxPower(POWER_MANA) * 25 / 10000;
+
+    // King of the jungle (Enrage)
+    if (GetId() == 5229)
+    {
+        if (apply)
+        {
+            Unit::AuraList const &dummy = m_target->GetAurasByType(SPELL_AURA_DUMMY);
+            for(Unit::AuraList::const_iterator i = dummy.begin(); i != dummy.end(); i++)
+            {
+                if ((*i)->GetSpellProto()->SpellFamilyName == SPELLFAMILY_DRUID &&
+                    (*i)->GetMiscValue() == 126)
+                {
+                    m_target->CastCustomSpell(m_target, 51185, &(*i)->GetModifier()->m_amount, NULL, NULL, true);
+                    break;
+                }
+            }
+        }
+        else
+            m_target->RemoveAurasDueToSpell(51185);
+    }
 }
 
 void Aura::HandleAuraPowerBurn(bool apply, bool /*Real*/)
