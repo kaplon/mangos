@@ -8170,6 +8170,14 @@ bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolM
                             crit_chance+=aura->GetModifier()->m_amount;
                             break;
                         }
+                        // Exorcism
+                        else if(spellProto->SpellFamilyFlags & UI64LIT(0x0200000000))
+                        {
+                            if(pVictim->GetCreatureType() == CREATURE_TYPE_DEMON
+                                || pVictim->GetCreatureType() == CREATURE_TYPE_UNDEAD)
+                                return true;
+                            break;
+                        }
                     break;
                     case SPELLFAMILY_SHAMAN:
                         // Lava Burst
