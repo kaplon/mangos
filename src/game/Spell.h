@@ -244,7 +244,6 @@ class Spell
         void EffectPickPocket(uint32 i);
         void EffectAddFarsight(uint32 i);
         void EffectSummonWild(uint32 i);
-        void EffectSummonAtRandomPoint(uint32 i);
         void EffectSummonGuardian(uint32 i);
         void EffectHealMechanical(uint32 i);
         void EffectJump(uint32 i);

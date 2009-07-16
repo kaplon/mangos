@@ -3237,9 +3237,6 @@ void Spell::EffectSummonType(uint32 i)
         case SUMMON_TYPE_UNKNOWN4:
         case SUMMON_TYPE_UNKNOWN5:
             break;
-        case SUMMON_TYPE_RANDOM_AT_RADIUS:
-            EffectSummonAtRandomPoint(i);
-        break;
         default:
             sLog.outError("EffectSummonType: Unhandled summon type %u", m_spellInfo->EffectMiscValueB[i]);
             break;
@@ -3343,7 +3340,6 @@ void Spell::EffectSummon(uint32 i)
         ((Player*)m_caster)->PetSpellInitialize();
     }
 }
-
 
 void Spell::EffectLearnSpell(uint32 i)
 {
@@ -3582,31 +3578,6 @@ void Spell::EffectAddFarsight(uint32 i)
     m_caster->GetMap()->Add(dynObj);
     if(m_caster->GetTypeId() == TYPEID_PLAYER)
         ((Player*)m_caster)->SetFarSightGUID(dynObj->GetGUID());
-}
-void Spell::EffectSummonAtRandomPoint(uint32 i)
-{
-    uint32 creature_entry = m_spellInfo->EffectMiscValue[i];
-    if(!creature_entry)
-        return;
-    float center_x = m_targets.m_destX;
-    float center_y = m_targets.m_destY;
-    float center_z = m_targets.m_destZ;
-    int32 amount = damage > 0 ? damage : 1;
-    float radius = GetSpellRadius(sSpellRadiusStore.LookupEntry(m_spellInfo->EffectRadiusIndex[i]));
-    float px, py, pz;
-    for(int32 i = 0;i<amount;i++)
-    {
-        if(radius == 0)
-        {
-            px = center_x;
-            py = center_y;
-            pz = center_z;
-        }else
-            m_caster->GetRandomPoint(center_x, center_y, center_z, radius, px, py, pz);
-        int32 duration = GetSpellDuration(m_spellInfo);
-        TempSummonType summonType = (duration == 0) ? TEMPSUMMON_DEAD_DESPAWN : TEMPSUMMON_TIMED_OR_DEAD_DESPAWN;
-        m_caster->SummonCreature(creature_entry, px, py, pz,0, summonType, duration);
-    }
 }
 
 void Spell::EffectSummonWild(uint32 i)

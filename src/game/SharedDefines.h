@@ -1033,7 +1033,6 @@ enum Targets
     TARGET_AREAEFFECT_PARTY_AND_CLASS  = 61,
     TARGET_DUELVSPLAYER_COORDINATES    = 63,
     TARGET_BEHIND_VICTIM               = 65,                // uses in teleport behind spells, caster/target dependent from spell effect
-    TARGET_RANDOM_DEST_IN_RADIUS       = 73,                //target or caster
     TARGET_DYNAMIC_OBJECT_COORDINATES  = 76,
     TARGET_SINGLE_ENEMY                = 77,
     TARGET_SELF2                       = 87,
@@ -2373,7 +2372,6 @@ enum SummonType
     SUMMON_TYPE_OBJECT      = 1141,
     SUMMON_TYPE_GUARDIAN2   = 1161,
     SUMMON_TYPE_ELEMENTAL   = 1561,
-    SUMMON_TYPE_RANDOM_AT_RADIUS = 1362,
     SUMMON_TYPE_FORCE_OF_NATURE = 1562
 };
 
