@@ -2347,19 +2347,6 @@ void Spell::cast(bool skipCheck)
             }
         }
     }
-    // King of the jungle (Tiger's fury energize)
-    else if(m_spellInfo->SpellFamilyName == SPELLFAMILY_DRUID && m_spellInfo->SpellIconID == 1181)
-    {
-        Unit::AuraList const &dummy = m_caster->GetAurasByType(SPELL_AURA_DUMMY);
-        for(Unit::AuraList::const_iterator i = dummy.begin(); i != dummy.end(); i++)
-            if ((*i)->GetSpellProto()->SpellFamilyName == SPELLFAMILY_DRUID &&
-                (*i)->GetMiscValue() == 126)
-            {
-                int32 basepoints = (*i)->GetSpellProto()->EffectBasePoints[(*i)->GetEffIndex()+1];
-                m_caster->CastCustomSpell(m_caster, 51178, &basepoints, NULL, NULL, true);
-                break;
-            }
-    }
 
     // traded items have trade slot instead of guid in m_itemTargetGUID
     // set to real guid to be sent later to the client
