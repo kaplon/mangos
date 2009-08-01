@@ -4448,44 +4448,6 @@ void Spell::EffectWeaponDmg(uint32 i)
                 }
             }
         }
-        case SPELLFAMILY_DEATHKNIGHT:
-        {
-            // Obliterate and Heart Strike
-            if(m_spellInfo->SpellFamilyFlags & 0x0002000001000000LL)
-            {
-                uint32 diseases = 0;
-                Unit::AuraMap& allAuras = unitTarget->GetAuras();
-                for(Unit::AuraMap::iterator iter = allAuras.begin(), next;iter != allAuras.end(); iter = next)
-                {
-                    next = iter;
-                    ++next;
-                    SpellEntry const *aurSpellInfo = iter->second->GetSpellProto();
-                    if(GetAllSpellMechanicMask(aurSpellInfo) & (1<<MECHANIC_INFECTED) && iter->second->GetCaster() == m_caster)
-                    {
-                        ++diseases;
-                        // Obliterate consumes diseases
-                        if(m_spellInfo->SpellFamilyFlags & 0x0002000000000000LL)
-                        {
-                            unitTarget->RemoveAurasDueToSpell(iter->second->GetId());
-                            if(allAuras.empty())
-                                break;
-                            else
-                                next = allAuras.begin();
-                        }
-                    }
-                }
-                if(diseases)
-                {
-                    switch(m_spellInfo->SpellIconID)
-                    {
-                        case 2639: totalDamagePercentMod *= (1 + 0.125f * diseases); break;
-                        case 3145: spell_bonus += int32((damage * 15 / 100) * diseases); break;
-                        default: break;
-                    }
-                }
-            }
-            break;
-        }
     }
 
     int32 fixed_bonus = 0;
