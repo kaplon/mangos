@@ -428,7 +428,7 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
     m_lastPotionId = 0;
 
     m_activeSpec = 0;
-    m_specsCount = 1;
+    m_specCount = 1;
 
     for (int i = 0; i < BASEMOD_END; ++i)
     {
@@ -3798,6 +3798,13 @@ bool Player::HasSpell(uint32 spell) const
         !itr->second->disabled);
 }
 
+bool Player::HasSpellForSpec(uint32 spell, uint32 spec) const
+{
+    PlayerSpellMap::const_iterator itr = m_spells.find(spell);
+    return (itr != m_spells.end() && itr->second->state != PLAYERSPELL_REMOVED &&
+        !itr->second->disabled);
+}
+
 bool Player::HasActiveSpell(uint32 spell) const
 {
     PlayerSpellMap::const_iterator itr = m_spells.find(spell);
@@ -5518,10 +5525,16 @@ int16 Player::GetSkillTempBonusValue(uint32 skill) const
 
 void Player::SendInitialActionButtons() const
 {
-    sLog.outDetail( "Initializing Action Buttons for '%u'", GetGUIDLow() );
+  SendActionButtons(m_activeSpec);
+}
+  
+void Player::SendActionButtons(uint32 spec) const
+{
+  
+    sLog.outDetail( "Sending Action Buttons for '%u'", GetGUIDLow() );
 
     WorldPacket data(SMSG_ACTION_BUTTONS, 1+(MAX_ACTION_BUTTONS*4));
-    data << uint8(0);                                       // can be 0, 1, 2 (talent spec)
+    data << uint8(spec);                                       // can be 0, 1, 2 (talent spec)
     for(int button = 0; button < MAX_ACTION_BUTTONS; ++button)
     {
         ActionButtonList::const_iterator itr = m_actionButtons.find(button);
@@ -5532,7 +5545,7 @@ void Player::SendInitialActionButtons() const
     }
 
     GetSession()->SendPacket( &data );
-    sLog.outDetail( "Action Buttons for '%u' Initialized", GetGUIDLow() );
+    sLog.outDetail( "Action Buttons for '%u' Sent", GetGUIDLow() );
 }
 
 ActionButton* Player::addActionButton(uint8 button, uint32 action, uint8 type)
@@ -14060,8 +14073,8 @@ float Player::GetFloatValueFromDB(uint16 index, uint64 guid)
 
 bool Player::LoadFromDB( uint32 guid, SqlQueryHolder *holder )
 {
-    ////                                                     0     1        2     3     4     5      6       7      8   9      10           11            12           13          14          15          16   17           18        19         20         21         22          23           24                 25                 26                 27       28       29       30       31         32           33            34        35    36      37                 38         39                  40                   41   42     43    44  45  46  47
-    //QueryResult *result = CharacterDatabase.PQuery("SELECT guid, account, data, name, race, class, gender, level, xp, money, playerBytes, playerBytes2, playerFlags, position_x, position_y, position_z, map, orientation, taximask, cinematic, totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_cost, resettalents_time, trans_x, trans_y, trans_z, trans_o, transguid, extra_flags, stable_slots, at_login, zone, online, death_expire_time, taxi_path, dungeon_difficulty, arena_pending_points,bgid,bgteam,bgmap,bgx,bgy,bgz,bgo FROM characters WHERE guid = '%u'", guid);
+    ////                                                     0     1        2     3     4     5      6       7      8   9      10           11            12           13          14          15          16   17           18        19         20         21         22          23           24                 25                 26                 27       28       29       30       31         32           33            34        35    36      37                 38         39                  40                    41         42
+    //QueryResult *result = CharacterDatabase.PQuery("SELECT guid, account, data, name, race, class, gender, level, xp, money, playerBytes, playerBytes2, playerFlags, position_x, position_y, position_z, map, orientation, taximask, cinematic, totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_cost, resettalents_time, trans_x, trans_y, trans_z, trans_o, transguid, extra_flags, stable_slots, at_login, zone, online, death_expire_time, taxi_path, dungeon_difficulty, arena_pending_points, speccount, activespec FROM characters WHERE guid = '%u'", guid);
     QueryResult *result = holder->GetResult(PLAYER_LOGIN_QUERY_LOADFROM);
 
     if(!result)
@@ -14102,6 +14115,9 @@ bool Player::LoadFromDB( uint32 guid, SqlQueryHolder *holder )
         delete result;
         return false;
     }
+
+    m_specCount = fields[41].GetUInt32();
+    m_activeSpec = fields[42].GetUInt32();
 
     // overwrite possible wrong/corrupted guid
     SetUInt64Value(OBJECT_FIELD_GUID, MAKE_NEW_GUID(guid, 0, HIGHGUID_PLAYER));
@@ -14461,6 +14477,7 @@ bool Player::LoadFromDB( uint32 guid, SqlQueryHolder *holder )
     //mails are loaded only when needed ;-) - when player in game click on mailbox.
     //_LoadMail();
 
+    _LoadGlyphs(holder->GetResult(PLAYER_LOGIN_QUERY_LOADGLYPHS));
     _LoadAuras(holder->GetResult(PLAYER_LOGIN_QUERY_LOADAURAS), time_diff);
     _LoadGlyphAuras();
 
@@ -15591,7 +15608,8 @@ void Player::SaveToDB()
         "taximask, online, cinematic, "
         "totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_cost, resettalents_time, "
         "trans_x, trans_y, trans_z, trans_o, transguid, extra_flags, stable_slots, at_login, zone, "
-        "death_expire_time, taxi_path, arena_pending_points, bgid, bgteam, bgmap, bgx, bgy, bgz, bgo) VALUES ("
+        "death_expire_time, taxi_path, arena_pending_points, bgid, bgteam, bgmap, bgx, bgy, bgz, bgo,"
+        "speccount,activespec) VALUES ("
         << GetGUIDLow() << ", "
         << GetSession()->GetAccountId() << ", '"
         << sql_name << "', "
@@ -15688,6 +15706,12 @@ void Player::SaveToDB()
     ss << ", '";
     ss << m_taxi.SaveTaxiDestinationsToString();
     ss << "', '0', ";
+
+    ss << ", ";
+    ss << uint32(m_specCount);
+    ss << ", ";
+    ss << uint32(m_activeSpec);
+
     ss << GetBattleGroundId();
     ss << ", ";
     ss << GetBGTeam();
@@ -15711,6 +15735,7 @@ void Player::SaveToDB()
     _SaveSpellCooldowns();
     _SaveActions();
     _SaveAuras();
+    _SaveGlyphs();
     m_achievementMgr.SaveToDB();
     m_reputationMgr.SaveToDB();
     _SaveEquipmentSets();
@@ -20210,13 +20235,13 @@ bool Player::canSeeSpellClickOn(Creature const *c) const
 void Player::BuildPlayerTalentsInfoData(WorldPacket *data)
 {
     *data << uint32(GetFreeTalentPoints());                 // unspentTalentPoints
-    *data << uint8(m_specsCount);                           // talent group count (0, 1 or 2)
+    *data << uint8(m_specCount);                           // talent group count (0, 1 or 2)
     *data << uint8(m_activeSpec);                           // talent group index (0 or 1)
 
-    if(m_specsCount)
+    if(m_specCount)
     {
         // loop through all specs (only 1 for now)
-        for(uint32 specIdx = 0; specIdx < m_specsCount; ++specIdx)
+        for(uint32 specIdx = 0; specIdx < m_specCount; ++specIdx)
         {
             uint8 talentIdCount = 0;
             size_t pos = data->wpos();
@@ -20243,7 +20268,7 @@ void Player::BuildPlayerTalentsInfoData(WorldPacket *data)
                     int32 curtalent_maxrank = -1;
                     for(int32 k = MAX_TALENT_RANK-1; k > -1; --k)
                     {
-                        if(talentInfo->RankID[k] && HasSpell(talentInfo->RankID[k]))
+                        if(talentInfo->RankID[k] && HasSpellForSpec(talentInfo->RankID[k], specIdx))
                         {
                             curtalent_maxrank = k;
                             break;
@@ -20266,7 +20291,7 @@ void Player::BuildPlayerTalentsInfoData(WorldPacket *data)
             *data << uint8(MAX_GLYPH_SLOT_INDEX);           // glyphs count
 
             for(uint8 i = 0; i < MAX_GLYPH_SLOT_INDEX; ++i)
-                *data << uint16(GetGlyph(i));               // GlyphProperties.dbc
+                *data << uint16(m_Glyphs[specIdx][i]);               // GlyphProperties.dbc
         }
     }
 }
@@ -20509,14 +20534,6 @@ void Player::DeleteEquipmentSet(uint64 setGuid)
     }
 }
 
-void Player::ActivateSpec(uint32 specNum)
-{
-    if(GetActiveSpec() == specNum)
-        return;
-
-    resetTalents(true);
-}
-
 void Player::RemoveAtLoginFlag( AtLoginFlags f, bool in_db_also /*= false*/ )
 {
     m_atLoginFlags &= ~f;
@@ -20551,4 +20568,193 @@ void Player::BuildTeleportAckMsg( WorldPacket *data, float x, float y, float z, 
 bool Player::HasMovementFlag( MovementFlags f ) const
 {
     return m_movementInfo.HasMovementFlag(f);
+}
+
+void Player::_LoadGlyphs(QueryResult *result) 
+{
+    // SetPQuery(PLAYER_LOGIN_QUERY_LOADGLYPHS, "SELECT spec, glyph1, glyph2, glyph3, glyph4, glyph5, glyph6 from character_glyphs WHERE guid = '%u'", GUID_LOPART(m_guid));
+    if (!result)
+        return;
+
+    do
+    {
+        Field *fields = result->Fetch();
+
+        uint8 spec = fields[0].GetUInt8();
+        if (spec >= m_specCount)
+            continue;
+
+        m_Glyphs[spec][0] = fields[1].GetUInt32();
+        m_Glyphs[spec][1] = fields[2].GetUInt32();
+        m_Glyphs[spec][2] = fields[3].GetUInt32();
+        m_Glyphs[spec][3] = fields[4].GetUInt32();
+        m_Glyphs[spec][4] = fields[5].GetUInt32();
+        m_Glyphs[spec][5] = fields[6].GetUInt32();
+    
+    } while (result->NextRow());
+
+    // make sure player data is set up
+    for (uint8 i = 0; i < MAX_GLYPH_SLOT_INDEX; ++i) 
+    {
+        SetGlyph(i, m_Glyphs[m_activeSpec][i]);
+    }  
+
+    delete result;
+}
+
+void Player::_SaveGlyphs()
+{
+    CharacterDatabase.PExecute("DELETE FROM character_glyphs WHERE guid='%u'",GetGUIDLow());
+    for (int spec = 0; spec < m_specCount; ++spec) 
+    {
+        CharacterDatabase.PExecute("INSERT INTO character_glyphs VALUES('%u', '%u', '%u', '%u', '%u', '%u', '%u', '%u')",
+            GetGUIDLow(), spec, m_Glyphs[spec][0], m_Glyphs[spec][1], m_Glyphs[spec][2], m_Glyphs[spec][3], m_Glyphs[spec][4], m_Glyphs[spec][5]);
+    }
+}
+
+void Player::LearnSecondarySpec() 
+{
+    // learn 63644
+    // learn 63645
+    // duplicate action buttons 
+    _SaveActions(); // make sure the button list is cleaned up
+    for(ActionButtonList::iterator itr = m_actionButtons.begin(); itr != m_actionButtons.end(); )
+    {
+        CharacterDatabase.PExecute("INSERT INTO character_action (guid,button,action,type,spec) VALUES ('%u', '%u', '%u', '%u', '1')",
+            GetGUIDLow(), (uint32)itr->first, (uint32)itr->second.GetAction(), (uint32)itr->second.GetType() );
+    }
+    m_specCount = 2;
+    // grant achievement
+}
+
+void Player::UnlearnSecondarySpec() 
+{
+    m_specCount = 1;
+}
+
+void Player::ActivatePrimarySpec()
+{
+    sLog.outDebug("Activating Primary Spec...");
+
+    ActivateSpec(0);
+
+    // set glyphs
+    for (int i=0;i<MAX_GLYPH_SLOT_INDEX;++i) {
+        // remove secondary glyph
+        if(uint32 oldglyph = m_Glyphs[1][i])
+        {
+            if(GlyphPropertiesEntry const *old_gp = sGlyphPropertiesStore.LookupEntry(oldglyph))
+            {
+                RemoveAurasDueToSpell(old_gp->SpellId);
+            }
+        }
+        // apply primary glyph
+        if (m_Glyphs[0][i])
+        {
+            if (GlyphPropertiesEntry const *gp = sGlyphPropertiesStore.LookupEntry(m_Glyphs[0][i]))
+            {
+                CastSpell(this, gp->SpellId, true);
+            }
+        }
+        SetGlyph(i, m_Glyphs[0][i]);
+    }
+}
+
+void Player::ActivateSecondarySpec() 
+{ 
+    sLog.outDebug("Activating Primary Spec...");
+
+    ActivateSpec(1);
+
+    // set glyphs
+    for (int i=0;i<MAX_GLYPH_SLOT_INDEX;++i) {
+        // remove secondary glyph
+        if(uint32 oldglyph = m_Glyphs[0][i])
+        {
+            if(GlyphPropertiesEntry const *old_gp = sGlyphPropertiesStore.LookupEntry(oldglyph))
+            {
+                RemoveAurasDueToSpell(old_gp->SpellId);
+            }
+        }
+        // apply primary glyph
+        if (m_Glyphs[1][i])
+        {
+            if (GlyphPropertiesEntry const *gp = sGlyphPropertiesStore.LookupEntry(m_Glyphs[1][i]))
+            {
+                CastSpell(this, gp->SpellId, true);
+            }
+        }
+        SetGlyph(i, m_Glyphs[1][i]);
+    }
+
+    // achievement for activating secondary spec?
+}
+
+void Player:: ActivateSpec(uint32 activatingSpec)
+{
+    uint32 const* talentTabIds = GetTalentTabPages(getClass());
+    for(uint32 i = 0; i < 3; ++i)
+    {
+        uint32 talentTabId = talentTabIds[i];
+
+        for(uint32 talentId = 0; talentId < sTalentStore.GetNumRows(); ++talentId)
+        {
+            TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
+            if(!talentInfo)
+                continue;
+
+            // skip another tab talents
+            if(talentInfo->TalentTab != talentTabId)
+                continue;
+
+            // find max talent rank
+            int32 curtalent_maxrank = -1;
+            for(int32 k = 4; k > -1; --k)
+            {
+                if(talentInfo->RankID[k] && HasSpellForSpec(talentInfo->RankID[k], m_activeSpec))
+                {
+                    removeSpell(talentInfo->RankID[k], true);
+                }
+            }
+        }
+    }
+    m_activeSpec = activatingSpec;
+    m_usedTalentCount = 0;
+
+    for(uint32 i = 0; i < 3; ++i)
+    {
+        uint32 talentTabId = talentTabIds[i];
+
+        for(uint32 talentId = 0; talentId < sTalentStore.GetNumRows(); ++talentId)
+        {
+            TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
+            if(!talentInfo)
+                continue;
+
+            // skip another tab talents
+            if(talentInfo->TalentTab != talentTabId)
+                continue;
+
+            // find max talent rank
+            int32 curtalent_maxrank = -1;
+            for(int32 k = 4; k > -1; --k)
+            {
+                if(talentInfo->RankID[k] && HasSpellForSpec(talentInfo->RankID[k], m_activeSpec))
+                {
+                    learnSpell(talentInfo->RankID[k], true);
+
+                    m_usedTalentCount += GetTalentSpellCost(talentInfo->RankID[k]);
+                }
+            }
+        }
+    }
+
+    QueryResult *result = CharacterDatabase.PQuery("SELECT button,action,type,misc FROM character_action WHERE guid = '%u' AND spec = '%u' ORDER BY button", GetGUIDLow(), m_activeSpec);
+    if (result)  
+    {
+        _LoadActions(result);
+    }
+    SendActionButtons(m_activeSpec);
+
+    InitTalentForLevel();
 }

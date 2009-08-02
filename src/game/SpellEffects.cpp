@@ -218,8 +218,8 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS]=
     &Spell::EffectMilling,                                  //158 SPELL_EFFECT_MILLING                  milling
     &Spell::EffectRenamePet,                                //159 SPELL_EFFECT_ALLOW_RENAME_PET         allow rename pet once again
     &Spell::EffectNULL,                                     //160 SPELL_EFFECT_160                      unused
-    &Spell::EffectNULL,                                     //161 SPELL_EFFECT_TALENT_SPEC_COUNT        second talent spec (learn/revert)
-    &Spell::EffectNULL,                                     //162 SPELL_EFFECT_TALENT_SPEC_SELECT       activate primary/secondary spec
+    &Spell::EffectSpecCount,                                //161 SPELL_EFFECT_TALENT_SPEC_COUNT        second talent spec (learn/revert)
+    &Spell::EffectActivateSpec,                             //162 SPELL_EFFECT_TALENT_SPEC_SELECT       activate primary/secondary spec
 };
 
 void Spell::EffectNULL(uint32 /*i*/)
@@ -713,6 +713,11 @@ void Spell::EffectDummy(uint32 i)
                     m_caster->CastSpell(m_caster,spell_id,true,NULL);
                     return;
                 }
+                case 63624: // Learn a Second Talent Specification
+                case 63651: // Revert to One Talent Spectification
+                    // achievement?
+                    // learn spells?
+                    break;
                 case 8593:                                  // Symbol of life (restore creature to life)
                 case 31225:                                 // Shimmering Vessel (restore creature to life)
                 {
@@ -5475,6 +5480,42 @@ void Spell::EffectSummonPlayer(uint32 /*i*/)
     data << uint32(m_caster->GetZoneId());                  // summoner zone
     data << uint32(MAX_PLAYER_SUMMON_DELAY*IN_MILISECONDS); // auto decline after msecs
     ((Player*)unitTarget)->GetSession()->SendPacket(&data);
+}
+
+void Spell::EffectSpecCount(uint32 /*eff_idx*/)
+{
+    if (unitTarget && unitTarget->GetTypeId() == TYPEID_PLAYER)
+    {
+        switch (m_spellInfo->Id) 
+        {
+            case 63644: // Activate Secondary Spec
+          ((Player*)unitTarget)->LearnSecondarySpec();
+                break;
+            case 63645: // Activate Primary Spec
+                ((Player*)unitTarget)->UnlearnSecondarySpec();
+                break;
+            default:
+                return;
+        }
+    }
+}
+
+void Spell::EffectActivateSpec(uint32 /*eff_idx*/)
+{
+    if (unitTarget && unitTarget->GetTypeId() == TYPEID_PLAYER)
+    {
+        switch (m_spellInfo->Id) 
+        {
+            case 63644: // Activate Secondary Spec
+                ((Player*)unitTarget)->ActivateSecondarySpec();
+                break;
+            case 63645: // Activate Primary Spec
+                ((Player*)unitTarget)->ActivatePrimarySpec();
+                break;
+            default:
+                return;
+        }
+    }
 }
 
 static ScriptInfo generateActivateCommand()
