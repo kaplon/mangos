@@ -5728,7 +5728,11 @@ void Aura::CleanupTriggeredSpells()
         m_target->RemoveAurasDueToSpell(30070);
         return;
     }
-
+    if(m_spellProto->Id == 5229)
+    {
+        // King of the Jungle
+        m_target->RemoveAurasDueToSpell(51185);
+    }
     uint32 tSpellId = m_spellProto->EffectTriggerSpell[GetEffIndex()];
     if(!tSpellId)
         return;
