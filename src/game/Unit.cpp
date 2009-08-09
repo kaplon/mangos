@@ -5701,24 +5701,44 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
 
                     break;
                 }
-                // Light's Beacon
-                case 53651:
-                {
-                    if(!pVictim)
-                        return false;
-
-                    if(Unit* caster = triggeredByAura->GetCaster())
-                    {
-                        Aura * dummy = caster->GetDummyAura(53563);
-                        if(dummy && dummy->GetCasterGUID() == pVictim->GetGUID())
-                        {
-                            triggered_spell_id = 53652;
-                            basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
-                            target = caster;
-                        }
-                    }
-                    break;
-                }
+		// Light's Beacon
+		case 53651:
+		{
+	            // pVictim is the person who has casted a heal. caster is the person who casted Beacon of Light.
+		    Unit* caster = triggeredByAura->GetCaster();
+ 
+ 		   if (caster)
+		    {
+		        if(!pVictim || pVictim->GetGUID() != caster->GetGUID())
+		            return false;
+ 
+	            // Find the Beacon of Light dummy aura
+		        Aura * dummy = NULL;
+		        AuraList& scAuras = caster->GetSingleCastAuras();
+		        for(AuraList::const_iterator itr = scAuras.begin(); itr != scAuras.end(); ++itr)
+		        {
+		            if((*itr)->GetId() == 53563)
+		            {
+		                dummy = (*itr);
+		                break;
+		            }
+		        }
+		        if(dummy)
+		        {
+		            if(dummy->GetCasterGUID() == caster->GetGUID())
+		            {
+                    // Nothing triggered when Beacon of Light is healed directly
+	                if (dummy->GetTarget()->GetGUID() == GetGUID())
+	                    return false;
+ 
+	                triggered_spell_id = 53652;
+	                basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
+	                target = dummy->GetTarget();
+	            }
+	        }
+	    }
+	    break;
+	}
                 // Glyph of Divinity
                 case 54939:
                 {
