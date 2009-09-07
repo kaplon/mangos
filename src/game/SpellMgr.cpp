@@ -385,6 +385,8 @@ bool IsPositiveEffect(uint32 spellId, uint32 effIndex)
             switch(spellId)
             {
                 case 28441: return false;                   // AB Effect 000
+        case 36032:                                         // Arcane Blast
+            return true;
                 default:
                     break;
             }
