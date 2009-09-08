@@ -8134,6 +8134,16 @@ uint32 Unit::SpellDamageBonus(Unit *pVictim, SpellEntry const *spellProto, uint3
                 if (pVictim->isFrozen())
                     DoneTotalMod *= 3.0f;
             }
+
+    // Glyph of Shadow Word: Pain
+    if (spellProto->Id == 58381 && this->HasAura(55687))
+    {
+        Aura *aur = this->GetAura(55687, 0);
+        //search for shadow word: pain on target
+        if (pVictim->GetAura(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_PRIEST, UI64LIT(0x0000000000008000)))
+            DoneTotalMod += aur->GetModifier()->m_amount * DoneTotalMod / 100;
+    }
+
             // Torment the weak affected (Arcane Barrage, Arcane Blast, Frostfire Bolt, Arcane Missiles, Fireball)
             if ((spellProto->SpellFamilyFlags & UI64LIT(0x0000900020200021)) && 
                 (pVictim->HasAuraType(SPELL_AURA_MOD_DECREASE_SPEED) || pVictim->HasAuraType(SPELL_AURA_MELEE_SLOW)))
