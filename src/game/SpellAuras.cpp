@@ -1338,6 +1338,14 @@ void Aura::HandleAddModifier(bool apply, bool Real)
         if(m_target->m_TotemSlot[i])
             if(Creature* totem = m_target->GetMap()->GetCreature(m_target->m_TotemSlot[i]))
                 ReapplyAffectedPassiveAuras(totem);
+    else if(m_spellProto->SpellFamilyName==SPELLFAMILY_DRUID && (m_spellmod->mask2 & UI64LIT(0x20000)))
+    {
+        m_target->RemoveAurasDueToSpell(66530);
+
+        // Aura 66530 is immediately applied ONLY when "Improved Barkskin" is learned in Caster/Travel Form
+        if(apply && (m_target->m_form == FORM_NONE || m_target->m_form == FORM_TRAVEL))
+            m_target->CastSpell(m_target,66530,true);
+    }
 }
 void Aura::HandleAddTargetTrigger(bool apply, bool /*Real*/)
 {
@@ -5575,6 +5583,20 @@ void Aura::HandleShapeshiftBoosts(bool apply)
                     }
                 }
             }
+
+    // Improved Barkskin - apply/remove armor bonus due to shapeshift
+    if (m_target->HasAura(63410) || m_target->HasAura(63411))
+    {
+        SpellEntry const *spellInfo = sSpellStore.LookupEntry(66530);
+        // Aura 66530 must not be revised if we (de)shift from/to Travel Form
+        if (spellInfo && !(spellInfo->Stances & (1<<form)))
+        {
+            if (apply) // We shapeshift to some form except Travel
+                m_target->RemoveAurasDueToSpell(66530);
+            else // We shapeshift to Caster form
+                m_target->CastSpell(m_target,66530,true);
+        }
+    }
 
             // Leader of the Pack
             if (((Player*)m_target)->HasSpell(17007))
