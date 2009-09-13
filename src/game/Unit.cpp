@@ -5774,26 +5774,6 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return true;
                     break;
                 }
-                // Light's Beacon
-                case 53651:
-                {
-                    if(!pVictim || pVictim == this)
-                        return false;
-
-                    Unit* caster = triggeredByAura->GetCaster();
-
-                    if (caster)
-                    {
-                        Aura * dummy = caster->GetDummyAura(53563);
-                        if(dummy && dummy->GetCasterGUID() == pVictim->GetGUID())
-                        {
-                            triggered_spell_id = 53652;
-                            basepoints0 = triggeredByAura->GetModifier()->m_amount*damage/100;
-                            target = caster;
-                        }
-                    }
-                    break;
-                }
                 // Seal of the Martyr do damage trigger
                 case 53720:
                 {

@@ -2414,19 +2414,6 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             }
             break;
         }
-        case SPELLFAMILY_PALADIN:
-        {
-            // Beacon of Light
-            if (GetId() == 53563)
-            {
-                if(apply)
-                    m_target->CastSpell(m_target,53651,true,NULL,this,GetCasterGUID());
-                else
-                    m_target->RemoveAurasDueToSpell(53651);
-                return;
-            }
-            break;
-        }
         case SPELLFAMILY_DRUID:
         {
             switch(GetId())
