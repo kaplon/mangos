@@ -6290,6 +6290,18 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
     m_zoneUpdateId    = newZone;
     m_zoneUpdateTimer = ZONE_UPDATE_INTERVAL;
 
+  uint32 map = GetMapId(); 
+
+    // Closed Northrend
+    if( !isGameMaster() && ( map  == 571 /*&& (newZone != 495 && newZone != 3537 && newZone != 65 && newZone != 394 && newZone != 4197 && newZone != 2817 && newZone != 4395)*/ ) ) // This rule doesn't affect GM 
+     {
+         if(!GetTransport() && !isInFlight()) // Not in transport, taxi
+         {
+             ChatHandler(this).PSendSysMessage(11100); //Inform player
+             TeleportTo(m_homebindMapId, m_homebindX, m_homebindY, m_homebindZ, GetOrientation());
+     }
+     }
+
     // zone changed, so area changed as well, update it
     UpdateArea(newArea);
 
