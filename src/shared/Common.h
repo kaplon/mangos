@@ -160,7 +160,7 @@ enum TimeConstants
 enum AccountTypes
 {
     SEC_PLAYER         = 0,
-    SEC_VIP	       = 1,
+    SEC_MODERATOR      = 1,
     SEC_GAMEMASTER     = 2,
     SEC_BUGTRACKER     = 3,
     SEC_ADMINISTRATOR  = 4,
