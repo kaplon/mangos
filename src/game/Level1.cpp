@@ -125,10 +125,36 @@ bool ChatHandler::HandleNpcWhisperCommand(const char* args)
 // global announce
 bool ChatHandler::HandleAnnounceCommand(const char* args)
 {
-    if(!*args)
+  int32 strid = 0;
+ 
+   if(!*args)
         return false;
 
-    sWorld.SendWorldText(LANG_SYSTEMMESSAGE,args);
+    switch(m_session->GetSecurity()) {
+      case SEC_MODERATOR:
+        strid = LANG_SYSTEMMESSAGE_MODERATOR;
+        break;
+      case SEC_GAMEMASTER:
+        strid = LANG_SYSTEMMESSAGE_GAMEMASTER;
+        break;
+      case SEC_BUGTRACKER:
+        strid = LANG_SYSTEMMESSAGE_BUGTRACKER;
+        break;
+      case SEC_ADMINISTRATOR:
+        strid = LANG_SYSTEMMESSAGE_ADMINISTRATOR;
+        break;
+      case SEC_SYSOP:
+        strid = LANG_SYSTEMMESSAGE_SYSOP;
+        break;
+      case SEC_CONSOLE:
+        strid = LANG_SYSTEMMESSAGE_CONSOLE;
+        break;
+      default:
+        return false;
+    }
+
+    sWorld.SendWorldText(strid, m_session->GetPlayerName(), args);
+
     return true;
 }
 

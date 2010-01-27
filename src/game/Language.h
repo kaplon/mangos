@@ -84,6 +84,12 @@ enum MangosStrings
     LANG_USING_SCRIPT_LIB               = 58,
     LANG_USING_EVENT_AI                 = 59,
     // Room for more level 0              60-99 not used
+    LANG_SYSTEMMESSAGE_MODERATOR        = 63,
+    LANG_SYSTEMMESSAGE_GAMEMASTER       = 64,
+    LANG_SYSTEMMESSAGE_BUGTRACKER       = 65,
+    LANG_SYSTEMMESSAGE_ADMINISTRATOR    = 66,
+    LANG_SYSTEMMESSAGE_SYSOP            = 67,
+    LANG_SYSTEMMESSAGE_CONSOLE          = 68,
 
     // level 1 chat
     LANG_GLOBAL_NOTIFY                  = 100,
