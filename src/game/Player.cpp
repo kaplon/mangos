@@ -1267,6 +1267,13 @@ void Player::Update( uint32 p_time )
     if (m_deathState == JUST_DIED)
     {
         KillPlayer();
+        if (GetHealth() > 0)
+            sLog.outDebug("Player '%s' (GUID: %u) JUST_DIED, has %u HP", GetName(), GetGUIDLow(), GetHealth());
+    }
+    if (!isAlive() && !HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST) && GetHealth() > 0)
+    {
+        sLog.outDebug("Player '%s' (GUID: %u) not alive nor ghost, has %u HP, setting health to 0", GetName(), GetGUIDLow(), GetHealth());
+        SetHealth(0);
     }
 
     if(m_nextSave > 0)
