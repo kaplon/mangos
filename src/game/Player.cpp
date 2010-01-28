@@ -1596,7 +1596,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         return false;
 
     // client without expansion support
-    if(GetSession()->Expansion() < mEntry->Expansion())
+    if(GetSession()->Expansion() < mEntry->Expansion() || ( !isGameMaster() && mapid == 571)/*NR Closed for non-gms*/)
     {
         sLog.outDebug("Player %s using client without required expansion tried teleport to non accessible map %u", GetName(), mapid);
 
